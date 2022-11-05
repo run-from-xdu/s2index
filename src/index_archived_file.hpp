@@ -8,6 +8,20 @@
 
 namespace ssindex {
 
+/// |IndexArchivedFile| has two working modes:
+///
+/// 1) Active Mode. In this mode, we can dynamically insert incoming
+/// key/value pairs to the certain partition of the buffer, and once a
+/// partition's buffer page is full, it's spilled to the disk automatically,
+/// the buffer page of that partition is refreshed as well. Every page
+/// id for every partitions is recorded internally, so that we can scan
+/// a certain partition's data without aware of the underlying layout.
+///
+/// 2) Frozen Mode. In this mode, the |IndexArchivedFile| is literally
+/// archived (i.e. read-only). In addition, all the data has been
+/// persisted to the disk, so at this point, |IndexArchivedFile| becomes
+/// a real "file". Since we don't store any metadata within the file,
+/// additional metadata saving process is needed for the crash safety.
 template<typename KeyType, typename ValueType>
 class IndexArchivedFile {
 public:
@@ -25,49 +39,10 @@ public:
     }
 
     /// write the given key/value to the certain partition
-    auto WriteData(size_t partition_id, const KeyType & key, const ValueType & value) -> Status {
-        //std::cout << *reinterpret_cast<uint64_t *>(buffers_[partition_id] + 32) << std::endl;
-        size_t offset = buffer_usages_[partition_id];
-        size_t left_space = pageSize() - offset;
-        size_t span = 0;
-        char * buffer = buffers_[partition_id];
-        auto status = Codec<KeyType>::EncodeValue(key, buffer + offset, left_space, &span);
-        if (status != Status::SUCCESS) {
-            /// TODO: handle space not enough
-            return status;
-        }
-        left_space -= span;
-        buffer_usages_[partition_id] += span;
-        offset += span;
-        status = Codec<ValueType>::EncodeValue(value, buffer + offset, left_space, &span);
-        if (status != Status::SUCCESS) {
-            /// TODO: handle space not enough
-            return status;
-        }
-        //std::cout << buffer_usages_[partition_id] << " " << *reinterpret_cast<uint64_t *>(buffer + buffer_usages_[partition_id]) << std::endl;
-        buffer_usages_[partition_id] += span;
-        return Status::SUCCESS;
-    }
+    auto WriteData(size_t partition_id, const KeyType & key, const ValueType & value) -> Status;
 
     /// read all the data of the certain partition
-    auto ReadData(size_t partition_id, std::vector<std::pair<KeyType, ValueType>> & result) const -> Status {
-        char * buffer = buffers_[partition_id];
-        size_t end = buffer_usages_[partition_id];
-        size_t curr_pos = 0;
-        while (curr_pos < end) {
-            KeyType key;
-            ValueType value;
-            size_t span = 0;
-            Codec<KeyType>::DecodeValue(buffer + curr_pos, &key, &span);
-            curr_pos += span;
-            Codec<ValueType>::DecodeValue(buffer + curr_pos, &value, &span);
-            //std::cout << *reinterpret_cast<uint64_t *>(buffer + 32) << std::endl;
-            curr_pos += span;
-            result.emplace_back(std::make_pair(key, value));
-        }
-        /// TODO: read on-disk data
-        return Status::SUCCESS;
-    }
+    auto ReadData(size_t partition_id, std::vector<std::pair<KeyType, ValueType>> & result) const -> Status;
 
     auto PrintInfo() {
         for (size_t i = 0; i < partition_num_; i++) {

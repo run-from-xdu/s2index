@@ -3,12 +3,19 @@ project(s2index)
 
 set(CMAKE_CXX_STANDARD 20)
 set(libs2index_src
+    src/bitvec.hpp
     src/bitvec.cpp
+    src/file_manager.hpp
     src/file_manager.cpp
+    src/ssindex.hpp
     src/ssindex.cpp
-        src/index_archived_file.cpp
+    src/index_archived_file.hpp
+    src/index_archived_file.cpp
+    src/index_block.hpp
     src/index_block.cpp
-        src/encoding.cpp
+    src/encoding.hpp
+    src/encoding.cpp
+    src/index_common.hpp
 )
 
 

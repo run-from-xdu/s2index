@@ -7,8 +7,9 @@
 
 namespace ssindex {
 
-/// FileManager manages the underlying storage of SsIndex, notice
-/// that the sequence of page allocating should be the same as writing.
+/// |FileManager| provides these two semantics:
+/// 1) write 4KB data to the underlying file -> return a handle called page id
+/// 2) read 4KB data via a page id
 class FileManager {
 public:
     /// number of bytes per page
