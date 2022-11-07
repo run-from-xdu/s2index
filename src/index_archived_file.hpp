@@ -46,13 +46,13 @@ public:
         }
     }
 
-    /// write the given key/value to the certain partition
+    /// Write the given key/value to the certain partition
     auto WriteData(size_t partition_id, KeyType key, ValueType value) -> Status;
 
-    /// read all the data of the certain partition
+    /// Read all the data of the certain partition
     auto ReadData(size_t partition_id, std::vector<std::pair<KeyType, ValueType>> & result) const -> Status;
 
-    /// sync all data on the disk
+    /// Sync all data on the disk
     auto SyncData() {
         file_manager_->Sync();
     }
@@ -93,21 +93,45 @@ private:
         return FileManager::PageSize;
     }
 
-    /// file manager of the underlying archived file
+    /// File manager of the underlying archived file
     std::unique_ptr<FileManager> file_manager_;
 
-    /// number of partitions
+    /// Number of partitions
     size_t partition_num_;
 
-    /// the id of pages (written to the disk) of each partitions
+    /// The id of pages (written to the disk) of each partitions
     std::vector<std::vector<uint64_t>> page_ids_;
 
-    /// memory buffer for each partition
+    /// Memory buffer for each partition
     std::vector<char *> buffers_;
 
-    /// usage of each buffer
+    /// Usage of each buffer
     std::vector<size_t> buffer_usages_;
 };
+
+/// TODO: implement this when in-memory logic is done
+//template<typename KeyType, typename ValueType>
+//class ArchivedFiles {
+//public:
+//    explicit ArchivedFiles(std::string directory) : directory_(std::move(directory)) {}
+//
+//private:
+//    using File = IndexArchivedFile<KeyType, ValueType>;
+//    using FilePtr = std::unique_ptr<File>;
+//
+//    auto TryCompaction(FilePtr compacted) -> Status;
+//
+//    /// Working directory
+//    std::string directory_;
+//
+//    /// Frozen-mode archived files
+//    std::vector<FilePtr> frozen_files_;
+//
+//    /// Active-mode archived file
+//    FilePtr active_file_;
+//
+//
+//};
 
 }  // namespace ssindex
 

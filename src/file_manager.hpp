@@ -13,7 +13,7 @@ namespace ssindex {
 /// 2) read 4KB data via a page id
 class FileManager {
 public:
-    /// number of bytes per page
+    /// Number of bytes per page
     static const size_t PageSize = 4096;
 
     explicit FileManager(std::string file_name)
@@ -50,13 +50,13 @@ private:
         return rc == 0 ? static_cast<int>(stat_buf.st_size) : -1;
     }
 
-    /// name of the working file
+    /// Name of the working file
     std::string file_name_;
 
-    /// file handle
+    /// File handle
     std::fstream data_file_;
 
-    /// page id allocator
+    /// Page id allocator
     uint64_t next_id_;
 };
 
