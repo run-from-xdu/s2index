@@ -14,7 +14,8 @@ using ReadBuffer = char *;
 
 enum Status : int {
     ERROR = -1,
-    SUCCESS = 0
+    SUCCESS = 0,
+    PAGE_FULL = 1
 };
 
 }  // namespace ssindex

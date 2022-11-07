@@ -24,5 +24,17 @@ TEST(TestEncoding, Basic) {
 
     std::string str_data_2{"xxxxxxxxxxxxxxxxxxxxxxxxxx"};
     char bufff[10];
-    EXPECT_EQ(ssindex::Status::ERROR, ssindex::Codec<std::string>::EncodeValue(str_data_2, bufff, 10));
+    EXPECT_EQ(ssindex::Status::PAGE_FULL, ssindex::Codec<std::string>::EncodeValue(str_data_2, bufff, 10));
+
+    std::string key{"key"};
+    uint64_t value = 100;
+    char buffff[100];
+    auto ss = ssindex::Codec<std::pair<std::string, uint64_t>>::EncodeValue(std::make_pair(key, value), buffff, 100);
+    EXPECT_EQ(ssindex::Status::SUCCESS, ss);
+    //std::cout << "...." << std::endl;
+    std::pair<std::string, uint64_t> kv_verify{};
+    size_t used = 0;
+    ssindex::Codec<std::pair<std::string, uint64_t>>::DecodeValue(buffff, &kv_verify, &used);
+    std::cout << used << std::endl;
+    std::cout << kv_verify.first << ", " << kv_verify.second << std::endl;
 }

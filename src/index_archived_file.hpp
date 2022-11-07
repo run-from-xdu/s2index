@@ -25,9 +25,11 @@ namespace ssindex {
 template<typename KeyType, typename ValueType>
 class IndexArchivedFile {
 public:
+    static constexpr size_t UsedSizeWidth = sizeof(uint64_t);
+
     explicit IndexArchivedFile(std::string file_name, size_t partition_num)
       : partition_num_(partition_num),
-        buffer_usages_(std::vector<size_t>(partition_num, 0)),
+        buffer_usages_(std::vector<size_t>(partition_num, UsedSizeWidth)),
         page_ids_(std::vector<std::vector<uint64_t>>(partition_num, std::vector<uint64_t>{})) {
         /// initialize buffers for each partition
         for (auto i = 0; i < partition_num_; i++) {
@@ -39,31 +41,45 @@ public:
     }
 
     /// write the given key/value to the certain partition
-    auto WriteData(size_t partition_id, const KeyType & key, const ValueType & value) -> Status;
+    auto WriteData(size_t partition_id, KeyType key, ValueType value) -> Status;
 
     /// read all the data of the certain partition
     auto ReadData(size_t partition_id, std::vector<std::pair<KeyType, ValueType>> & result) const -> Status;
 
+    /// sync all data on the disk
+    auto SyncData() {
+        file_manager_->Sync();
+    }
+
     auto PrintInfo() {
         for (size_t i = 0; i < partition_num_; i++) {
-            std::cout << "Part" << i << " : " << buffer_usages_[i] << std::endl;
+            std::cout << "Part" << i << " : " << buffer_usages_[i] << " ";
+            if (page_ids_[i].size() == 0) std::cout << "No Page Allocated";
+            for (size_t j = 0; j < page_ids_[i].size(); j++) std::cout << page_ids_[i][j] << " ";
+            std::cout << std::endl;
         }
     }
 private:
     auto resetBuffer(size_t partition_id) {
         char * buffer = buffers_[partition_id];
         memset(buffer, 0, FileManager::PageSize);
-        buffer_usages_[partition_id] = 0;
+        buffer_usages_[partition_id] = UsedSizeWidth;
+    }
+
+    auto flushBuffer(size_t partition_id) {
+        char * buf = buffers_[partition_id];
+        /// record used size
+        Codec<uint64_t>::EncodeValue(buffer_usages_[partition_id], buf, UsedSizeWidth);
+        uint64_t pid;
+        file_manager_->WritePage(&pid, buf);
+        resetBuffer(partition_id);
+        auto & pids = page_ids_[partition_id];
+        pids.emplace_back(pid);
     }
 
     auto flushAllBuffers() {
         for (size_t i = 0; i < partition_num_; i++) {
-            char * buf = buffers_[i];
-            uint64_t pid;
-            file_manager_->WritePage(&pid, buf);
-            resetBuffer(i);
-            auto & pids = page_ids_[i];
-            pids.emplace_back(pid);
+            flushBuffer(i);
         }
     }
 

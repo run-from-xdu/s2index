@@ -34,6 +34,10 @@ public:
 
     /// Read the contents of the specified page into the given memory area
     auto ReadPage(uint64_t page_id, ReadBuffer result) -> Status;
+
+    auto Sync() {
+        data_file_.sync();
+    }
 private:
     static inline auto GetOffset(uint64_t page_id) -> size_t {
         return static_cast<size_t>(page_id) * PageSize;
