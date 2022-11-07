@@ -3,6 +3,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <fstream>
+#include <iostream>
 #include "index_common.hpp"
 
 namespace ssindex {

@@ -44,9 +44,6 @@ auto IndexArchivedFile<KeyType, ValueType>::ReadData(size_t partition_id, std::v
             curr_pos += span;
             res.emplace_back(entry);
         }
-//        std::cout << res[0].first << ", " << res[0].second << std::endl;
-//        std::cout << "......" << std::endl;
-//        std::cout << res[1].first << ", " << res[1].second << std::endl;
     };
 
     char * buffer = buffers_[partition_id];
@@ -55,17 +52,15 @@ auto IndexArchivedFile<KeyType, ValueType>::ReadData(size_t partition_id, std::v
 
     pageIterator(buffer, curr_pos, end, result);
 
-    char * page_buffer = new char[pageSize()];
+    auto page_buffer = std::make_unique<char[]>(pageSize());
     for (uint64_t page_id : page_ids_[partition_id]) {
-        file_manager_->ReadPage(page_id, page_buffer);
+        file_manager_->ReadPage(page_id, page_buffer.get());
         uint64_t used;
-        Codec<uint64_t>::DecodeValue(page_buffer, &used);
+        Codec<uint64_t>::DecodeValue(page_buffer.get(), &used);
         end = static_cast<size_t>(used);
         curr_pos = UsedSizeWidth;
-        pageIterator(page_buffer, curr_pos, end, result);
-        //std::cout << "finish a page " << std::endl;
+        pageIterator(page_buffer.get(), curr_pos, end, result);
     }
-    delete []page_buffer;
     return Status::SUCCESS;
 }
 

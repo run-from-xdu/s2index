@@ -40,6 +40,12 @@ public:
         file_manager_ = std::make_unique<FileManager>(std::move(file_name));
     }
 
+    ~IndexArchivedFile() {
+        for (auto & buffer : buffers_) {
+            delete [] buffer;
+        }
+    }
+
     /// write the given key/value to the certain partition
     auto WriteData(size_t partition_id, KeyType key, ValueType value) -> Status;
 
@@ -54,8 +60,8 @@ public:
     auto PrintInfo() {
         for (size_t i = 0; i < partition_num_; i++) {
             std::cout << "Part" << i << " : " << buffer_usages_[i] << " ";
-            if (page_ids_[i].size() == 0) std::cout << "No Page Allocated";
-            for (size_t j = 0; j < page_ids_[i].size(); j++) std::cout << page_ids_[i][j] << " ";
+            if (page_ids_[i].empty()) std::cout << "No Page Allocated";
+            for (auto j : page_ids_[i]) std::cout << j << " ";
             std::cout << std::endl;
         }
     }
