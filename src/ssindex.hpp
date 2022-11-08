@@ -33,10 +33,10 @@ private:
     /// Archived files ｜ TODO: replace with the real implementation
     std::vector<std::unique_ptr<IndexArchivedFile<KeyType, ValueType>>> files_;
 
-    /// in-memory hashtable
+    /// In-memory hashtable
     std::unordered_map<KeyType, ValueType> memtable_;
 
-    /// index blocks
+    /// Index blocks
     std::vector<std::unique_ptr<IndexBlock<ValueType>>> index_blocks_;
 
 

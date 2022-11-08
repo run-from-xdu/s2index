@@ -10,10 +10,10 @@ namespace ssindex {
 template<typename ValueType>
 class IndexEdge {
 public:
-    explicit IndexEdge() : code_(0) {}
+    explicit IndexEdge() : value_(0) {}
 
     explicit IndexEdge(const char * str, const size_t len, const ValueType & code, const uint64_t seed)
-        : code_(code) {
+        : value_(code) {
         HASH(str, len, seed, v_[0], v_[1], v_[2]);
     }
 
@@ -29,19 +29,18 @@ public:
     }
 
     auto write(std::ofstream & ofs) const {
-        ofs.write((const char *)(&code_), sizeof(code_));
+        ofs.write((const char *)(&value_), sizeof(value_));
         ofs.write((const char *)(&v_[0]), sizeof(v_[0]) * NumHashFunctions);
     }
 
     auto read(std::ifstream& ifs) {
-        ifs.read((char *)(&code_), sizeof(code_));
+        ifs.read((char *)(&value_), sizeof(value_));
         ifs.read((char *)(&v_[0]), sizeof(v_[0]) * NumHashFunctions);
-
     }
 private:
     uint64_t v_[NumHashFunctions]{};
 
-    ValueType code_;
+    ValueType value_;
 };
 
 }  // namespace ssindex
