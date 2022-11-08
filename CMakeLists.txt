@@ -3,8 +3,6 @@ project(s2index)
 
 set(CMAKE_CXX_STANDARD 20)
 set(libs2index_src
-    src/bitvec.hpp
-    src/bitvec.cpp
     src/file_manager.hpp
     src/file_manager.cpp
     src/ssindex.hpp
@@ -15,7 +13,10 @@ set(libs2index_src
     src/index_block.cpp
     src/encoding.hpp
     src/encoding.cpp
+
+    src/index_edge.hpp
     src/index_common.hpp
+    src/bitvec.hpp
 )
 
 
@@ -44,5 +45,11 @@ target_link_libraries(encoding_test GTest::gtest_main)
 add_executable(index_archived_file_test test/index_archived_file_test.cpp ${libs2index_src})
 target_link_libraries(index_archived_file_test GTest::gtest_main)
 
+add_executable(bitvec_test test/bitvec_test.cpp ${libs2index_src})
+target_link_libraries(bitvec_test GTest::gtest_main)
+
+add_executable(index_common_test test/index_common_test.cpp ${libs2index_src})
+target_link_libraries(index_common_test GTest::gtest_main)
+
 include(GoogleTest)
-gtest_discover_tests(file_manager_test encoding_test index_archived_file_test)
+gtest_discover_tests(file_manager_test encoding_test index_archived_file_test bitvec_test)
