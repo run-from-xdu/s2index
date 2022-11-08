@@ -14,7 +14,7 @@ auto IndexBlock<ValueType>::GetValue(const IndexEdge<ValueType> & ie) const -> V
     uint64_t block_size = bits_occupied_by_value_ + bits_occupied_by_fp_;
     if (bits_occupied_by_fp_ != 0) {
         uint64_t fp_check = 0;
-        for (uint64_t i = 0; i < 3; ++i) {
+        for (uint64_t i = 0; i < NumHashFunctions; ++i) {
             fp_check ^= data_.getBits(ie.get(i, num_v_) * block_size, bits_occupied_by_fp_);
             //std::cout << fp_check << " ";
         }
@@ -25,7 +25,7 @@ auto IndexBlock<ValueType>::GetValue(const IndexEdge<ValueType> & ie) const -> V
     }
 
     ValueType result{};
-    for (uint64_t i = 0; i < 3; ++i) {
+    for (uint64_t i = 0; i < NumHashFunctions; ++i) {
         result ^= data_.getBits(ie.get(i, num_v_) * block_size + bits_occupied_by_fp_, bits_occupied_by_value_);
     }
 
@@ -66,20 +66,20 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
     bits_occupied_by_value_ = IndexUtils<ValueType>::log2(max_value_ - min_value_);
     std::cout << "Value Bits: " << bits_occupied_by_value_ << std::endl;
     /// number of vertices
-    num_v_ = static_cast<uint64_t>(entry_num_ * kScale / double(3) + intercept);
+    num_v_ = static_cast<uint64_t>(entry_num_ * kScale / double(NumHashFunctions) + intercept);
 
     uint64_t bits_per_value_with_fp = bits_occupied_by_value_ + bits_occupied_by_fp_;
     uint64_t points_per_entry = 1;
 
     /// set index_edges
     uint64_t space = 0;
-    std::vector<uint8_t> degs(num_v_ * 3 + space);
-    std::vector<uint64_t> offsets(num_v_ * 3 + space + 1);
+    std::vector<uint8_t> degs(num_v_ * NumHashFunctions + space);
+    std::vector<uint64_t> offsets(num_v_ * NumHashFunctions + space + 1);
 
     for (size_t i = 0; i < index_edges.size(); ++i) {
         const IndexEdge<ValueType> & ie = index_edges[i];
         uint64_t len = 1;
-        for (uint64_t j = 0; j < 3; ++j) {
+        for (uint64_t j = 0; j < NumHashFunctions; ++j) {
             uint64_t t = ie.get(j, num_v_);
             for (uint64_t k = 0; k < len; ++k) {
                 if (degs[t + k] == 0xFF) {
@@ -100,12 +100,12 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
     offsets.back() = sum;
 
     /// set edges
-    uint64_t total_edge_num = entry_num_ * 3;
+    uint64_t total_edge_num = entry_num_ * NumHashFunctions;
     std::vector<uint64_t> edges(total_edge_num);
     for (size_t i = 0; i < index_edges.size(); ++i) {
         const IndexEdge<ValueType> & ie = index_edges[i];
         uint64_t len = 1;
-        for (uint64_t j = 0; j < 3; ++j) {
+        for (uint64_t j = 0; j < NumHashFunctions; ++j) {
             uint64_t t = ie.get(j, num_v_);
             for (uint64_t k = 0; k < len; ++k) {
                 edges[offsets[t + k] + degs[t + k]++] = i * points_per_entry + k;
@@ -139,7 +139,7 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
 
         const IndexEdge<ValueType>& ie(index_edges[keyID]);
         int choosed = -1;
-        for (uint64_t i = 0; i < 3; ++i)
+        for (uint64_t i = 0; i < NumHashFunctions; ++i)
         {
             const uint64_t t = ie.get(i, num_v_);
             --degs[t + offset];
@@ -173,10 +173,10 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
     }
 
     assert(q.empty());
-    data_.Resize(num_v_ * bits_per_value_with_fp * 3);
+    data_.Resize(num_v_ * bits_per_value_with_fp * NumHashFunctions);
 
     uint64_t block_size = bits_per_value_with_fp;
-    BitVec<uint64_t> visited_vertices(assign_num * 3);
+    BitVec<uint64_t> visited_vertices(assign_num * NumHashFunctions);
     std::reverse(extracted_edges.begin(),  extracted_edges.end());
     for (auto & extracted_edge : extracted_edges) {
         const uint64_t v = extracted_edge.first;
@@ -188,7 +188,7 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
         uint64_t bits_write_value = bits_per_value_with_fp;
         uint64_t bits = (ie.value_ << bits_occupied_by_fp_) + signature;
 
-        for (uint64_t i = 0; i < 3; ++i) {
+        for (uint64_t i = 0; i < NumHashFunctions; ++i) {
             const uint64_t t = ie.get(i, num_v_);
             if (!(visited_vertices.getBit(t + offset))) {
                 continue;

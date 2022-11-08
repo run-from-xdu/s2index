@@ -34,13 +34,19 @@ template<>
 class Codec<std::string> {
 public:
     static auto EncodeValue(std::string src, char * dest, size_t space, size_t * used = nullptr) -> Status {
-        if (src.size() + sizeof(uint64_t) >= space) {
-            return Status::PAGE_FULL;
+        if (src.size() + sizeof(uint64_t) >= space || space == static_cast<size_t>(-1)) {
+            if (space != static_cast<size_t>(-1)) {
+                return Status::PAGE_FULL;
+            }
+            char * allocated = new char[src.size() + sizeof(uint64_t)];
+            //std::swap(dest, allocated);
+            *dest = *allocated;
         }
         uint64_t length = src.size();
         Codec<uint64_t>::EncodeValue(length, dest, sizeof(uint64_t));
 
-        strcpy(dest + sizeof(uint64_t), src.data());
+        //strcpy(dest + sizeof(uint64_t), src.data());
+        memcpy(dest + sizeof(uint64_t), src.data(), length);
 
         if (used != nullptr) {
             *used = sizeof(uint64_t) + static_cast<size_t>(length);
@@ -52,13 +58,11 @@ public:
         char * src_ptr = const_cast<char *>(src);
         uint64_t length = 0;
         Codec<uint64_t>::DecodeValue(src_ptr, &length);
-        //std::cout << length << std::endl;
         src_ptr += sizeof(uint64_t);
-        //dest->assign(src_ptr, length);
-        //*dest = std::string{src_ptr};
 
         char * temp = new char[length + 1];
-        memcpy(temp, src_ptr, length + 1);
+        memcpy(temp, src_ptr, length);
+        temp[length] = '\0';
         *dest = std::string{temp};
 
         if (used != nullptr) {
@@ -82,7 +86,8 @@ public:
         uint64_t length = key.size();
         Codec<uint64_t>::EncodeValue(length, dest, sizeof(uint64_t));
 
-        strcpy(dest + sizeof(uint64_t), key.data());
+        //strcpy(dest + sizeof(uint64_t), key.data());
+        memcpy(dest + sizeof(uint64_t), key.data(), length);
 
         Codec<uint64_t>::EncodeValue(entry.second, dest + sizeof(uint64_t) + length, sizeof(uint64_t));
 
@@ -105,7 +110,6 @@ public:
         *dest = std::make_pair(std::move(key), value);
         if (used != nullptr) {
             *used = used1 + used2;
-            //std::cout << *used << " xxx" << std::endl;
         }
     }
 };

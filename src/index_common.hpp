@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <cassert>
 
 namespace ssindex {
 
@@ -12,7 +13,10 @@ static constexpr auto GetFullPath(const std::string & file_name) -> std::string 
 using WriteBuffer = const char *;
 using ReadBuffer = char *;
 
+/// Number of Hash in IndexBlock
 static constexpr size_t NumHashFunctions = 3;
+/// Threshold of flushing memtable to the disk
+static constexpr size_t MemtableFlushThreshold = 1000000;
 
 enum Status : int {
     ERROR = -1,
@@ -35,6 +39,8 @@ enum Status : int {
     c -= a; c -= b; c ^= (b>>22);
 
 static auto HASH(const char * str, size_t len, uint64_t seed, uint64_t & a, uint64_t & b, uint64_t & c) {
+    assert(str != nullptr);
+    //std::cout << str << " " << len << std::endl;
     const auto * data = reinterpret_cast<const uint64_t *>(str);
     const uint64_t * end = data + len / 24;
 

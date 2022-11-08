@@ -18,6 +18,7 @@ template<typename KeyType, typename ValueType>
 class SsIndex {
 public:
     static constexpr ValueType KeyNotFound = IndexUtils<ValueType>::KeyNotFound;
+    static constexpr size_t MemtableFlushThreshold = IndexUtils<ValueType>::MemtableFlushThreshold;
 
     explicit SsIndex(std::string directory) : working_directory_(std::move(directory)) {}
 

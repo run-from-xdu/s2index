@@ -63,8 +63,8 @@ TEST(TestIndexArchivedFile, Hybrid) {
 
     auto checkExistence = [](std::vector<std::pair<std::string, uint64_t>> & result, std::string && key) {
         for (auto & entry : result) {
-            if (strcmp(key.c_str(), entry.first.c_str()) != 0) {
-                std::cout << "key: " << key << ", " << "value: " << entry.second << " found!" << std::endl;
+            if (key == entry.first) {
+                std::cout << "key: " << entry.first << ", " << "value: " << entry.second << " found!" << std::endl;
                 return;
             }
         }
@@ -75,11 +75,8 @@ TEST(TestIndexArchivedFile, Hybrid) {
     size_t entryNum = 10000;
     for (size_t i = 0; i < entryNum; i++) {
         auto key = "key" + std::to_string(i);
-        //size_t l = key.size();
-        //for (size_t i = l; i < 8; i++) key += "0";
         auto value = static_cast<uint64_t>(i);
         file.WriteData(4, key, value);
-        //std::cout << "success " << i << std::endl;
     }
     file.SyncData();
     file.PrintInfo();
@@ -87,6 +84,6 @@ TEST(TestIndexArchivedFile, Hybrid) {
     EXPECT_EQ(ssindex::Status::SUCCESS, file.ReadData(4, res));
     printResult(res);
     checkExistence(res, std::string("key0"));
-    checkExistence(res, std::string("key9999"));
+    checkExistence(res, std::string("key9961"));
     //file.PrintInfo();
 }
