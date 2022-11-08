@@ -68,8 +68,5 @@ template class IndexArchivedFile<std::string, uint64_t>;
 template class IndexArchivedFile<std::string, uint32_t>;
 template class IndexArchivedFile<std::string, uint16_t>;
 template class IndexArchivedFile<std::string, uint8_t>;
-template class IndexArchivedFile<std::string, int64_t>;
-template class IndexArchivedFile<std::string, int32_t>;
-template class IndexArchivedFile<std::string, int16_t>;
-template class IndexArchivedFile<std::string, int8_t>;
+
 }  // namespace ssindex

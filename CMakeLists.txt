@@ -51,5 +51,14 @@ target_link_libraries(bitvec_test GTest::gtest_main)
 add_executable(index_common_test test/index_common_test.cpp ${libs2index_src})
 target_link_libraries(index_common_test GTest::gtest_main)
 
+add_executable(index_block_test test/index_block_test.cpp ${libs2index_src})
+target_link_libraries(index_block_test GTest::gtest_main)
+
 include(GoogleTest)
-gtest_discover_tests(file_manager_test encoding_test index_archived_file_test bitvec_test)
+gtest_discover_tests(
+        file_manager_test
+        encoding_test
+        index_archived_file_test
+        bitvec_test
+        index_block_test
+)

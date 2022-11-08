@@ -93,25 +93,28 @@ struct IndexUtils {
     static auto mask(const ValueType & x, const uint64_t & len) -> ValueType;
 
     static auto maskCheckLen(const ValueType & x, const uint64_t & len) -> ValueType;
+
+    /// |KeyNotFound| will be returned as the result if key not found
+    static constexpr ValueType KeyNotFound = static_cast<ValueType>(-1);
 };
 
 template<typename ValueType>
-auto IndexUtils<ValueType>::log2(const ValueType &x) -> uint64_t {
+auto IndexUtils<ValueType>::log2(const ValueType & x) -> uint64_t {
     return 0;
 }
 
-//template<>
-//auto IndexUtils<uint64_t>::log2(const uint64_t &x) -> uint64_t {
-//    return 64 - __builtin_clzll(x);
-//}
+template<>
+inline auto IndexUtils<uint64_t>::log2(const uint64_t & x) -> uint64_t {
+    return 64 - __builtin_clzll(x);
+}
 
 template<typename ValueType>
-auto IndexUtils<ValueType>::mask(const ValueType &x, const uint64_t &len) -> ValueType {
+auto IndexUtils<ValueType>::mask(const ValueType & x, const uint64_t & len) -> ValueType {
     return x & ((static_cast<ValueType>(1) << len) - 1);
 }
 
 template<typename ValueType>
-auto IndexUtils<ValueType>::maskCheckLen(const ValueType &x, const uint64_t &len) -> ValueType {
+auto IndexUtils<ValueType>::maskCheckLen(const ValueType & x, const uint64_t & len) -> ValueType {
     if (len >= sizeof(ValueType) * 8) return x;
     return mask(x, len);
 }

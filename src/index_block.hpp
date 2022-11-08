@@ -21,7 +21,7 @@ public:
         , bits_occupied_by_value_(0)
         , bits_occupied_by_fp_(default_fp_bits)
         , seed_(0x12345678)
-        , partition_num_(0) {}
+        , num_v_(0) {}
 
     auto GetValue(const IndexEdge<ValueType> & edge) const -> ValueType;
 
@@ -41,7 +41,7 @@ public:
         ofs.write((const char *)(&bits_occupied_by_value_), sizeof(bits_occupied_by_value_));
         ofs.write((const char *)(&bits_occupied_by_fp_), sizeof(bits_occupied_by_fp_));
         ofs.write((const char *)(&seed_), sizeof(seed_));
-        ofs.write((const char *)(&partition_num_), sizeof(partition_num_));
+        ofs.write((const char *)(&num_v_), sizeof(num_v_));
 
         data_.write(ofs);
     }
@@ -53,7 +53,7 @@ public:
         ifs.read((char *)(&bits_occupied_by_value_), sizeof(bits_occupied_by_value_));
         ifs.read((char *)(&bits_occupied_by_fp_), sizeof(bits_occupied_by_fp_));
         ifs.read((char *)(&seed_), sizeof(seed_));
-        ifs.read((char *)(&partition_num_), sizeof(partition_num_));
+        ifs.read((char *)(&num_v_), sizeof(num_v_));
 
         data_.read(ifs);
     }
@@ -77,8 +77,8 @@ private:
     /// Seed for randomization
     uint64_t seed_;
 
-    /// Number of partitions in the block
-    uint64_t partition_num_;
+    /// Number of vertices of each block in the hyper graph
+    uint64_t num_v_;
 
     /// Number of key/value pairs in this block
     uint64_t entry_num_;

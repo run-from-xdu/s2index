@@ -3,6 +3,7 @@
 #include <vector>
 #include <fstream>
 #include <iostream>
+#include <cassert>
 
 #include "index_common.hpp"
 
@@ -36,7 +37,7 @@ public:
         if (offset + len < BitsNum) {
             auto v1 = (data_[index] & (~(((1LLU << len) - 1) << offset)));
             auto v2 = uint64_t(bits) << offset;
-            std::cout << std::bitset<sizeof(v1)*8>(v1) << ", " << std::bitset<sizeof(v2)*8>(v2) << std::endl;
+            //std::cout << std::bitset<sizeof(v1)*8>(v1) << ", " << std::bitset<sizeof(v2)*8>(v2) << std::endl;
             data_[index] = (data_[index] & (~(((1LLU << len) - 1) << offset))) | uint64_t(bits) << offset;
             return;
         }

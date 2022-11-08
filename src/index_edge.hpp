@@ -8,8 +8,7 @@
 namespace ssindex {
 
 template<typename ValueType>
-class IndexEdge {
-public:
+struct IndexEdge {
     explicit IndexEdge() : value_(0) {}
 
     explicit IndexEdge(const char * str, const size_t len, const ValueType & code, const uint64_t seed)
@@ -17,8 +16,8 @@ public:
         HASH(str, len, seed, v_[0], v_[1], v_[2]);
     }
 
-    auto get(uint64_t i, uint64_t partition_id) const -> uint64_t {
-        return (v_[i] % partition_id) + partition_id * i;
+    auto get(uint64_t i, uint64_t num_v) const -> uint64_t {
+        return (v_[i] % num_v) + num_v * i;
     }
 
     auto operator < (const IndexEdge & other) const -> bool {
@@ -37,7 +36,7 @@ public:
         ifs.read((char *)(&value_), sizeof(value_));
         ifs.read((char *)(&v_[0]), sizeof(v_[0]) * NumHashFunctions);
     }
-private:
+
     uint64_t v_[NumHashFunctions]{};
 
     ValueType value_;

@@ -17,8 +17,7 @@ namespace ssindex {
 template<typename KeyType, typename ValueType>
 class SsIndex {
 public:
-    /// |KeyNotFound| will be returned as the result if key not found
-    static constexpr ValueType KeyNotFound = static_cast<ValueType>(-1);
+    static constexpr ValueType KeyNotFound = IndexUtils<ValueType>::KeyNotFound;
 
     explicit SsIndex(std::string directory) : working_directory_(std::move(directory)) {}
 

@@ -32,7 +32,7 @@ public:
         buffer_usages_(std::vector<size_t>(partition_num, UsedSizeWidth)),
         page_ids_(std::vector<std::vector<uint64_t>>(partition_num, std::vector<uint64_t>{})) {
         /// initialize buffers for each partition
-        for (auto i = 0; i < partition_num_; i++) {
+        for (auto i = 0; i < partition_num_; ++i) {
             buffers_.emplace_back(new char[FileManager::PageSize]);
         }
 
@@ -58,7 +58,7 @@ public:
     }
 
     auto PrintInfo() {
-        for (size_t i = 0; i < partition_num_; i++) {
+        for (size_t i = 0; i < partition_num_; ++i) {
             std::cout << "Part" << i << " : " << buffer_usages_[i] << " ";
             if (page_ids_[i].empty()) std::cout << "No Page Allocated";
             for (auto j : page_ids_[i]) std::cout << j << " ";
@@ -84,7 +84,7 @@ private:
     }
 
     auto flushAllBuffers() {
-        for (size_t i = 0; i < partition_num_; i++) {
+        for (size_t i = 0; i < partition_num_; ++i) {
             flushBuffer(i);
         }
     }
