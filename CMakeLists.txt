@@ -17,6 +17,8 @@ set(libs2index_src
     src/index_edge.hpp
     src/index_common.hpp
     src/bitvec.hpp
+        src/scheduler.hpp
+        src/task_flush_memtable.hpp
 )
 
 

@@ -2,12 +2,18 @@
 
 #include <string>
 #include <cassert>
+#include <atomic>
 
 namespace ssindex {
 
 static const std::string default_working_directory = "/tmp/temp_data/";
 static constexpr auto GetFullPath(const std::string & file_name) -> std::string {
     return default_working_directory + file_name;
+}
+
+static std::atomic_uint64_t file_sequence_number = 0;
+static auto FetchNextFileName() -> std::string {
+    return GetFullPath(std::to_string(file_sequence_number.fetch_add(1)));
 }
 
 using WriteBuffer = const char *;
@@ -17,6 +23,8 @@ using ReadBuffer = char *;
 static constexpr size_t NumHashFunctions = 3;
 /// Threshold of flushing memtable to the disk
 static constexpr size_t MemtableFlushThreshold = 1000000;
+/// Default number of partitions
+static constexpr uint64_t DefaultPartitionNum = 32;
 
 enum Status : int {
     ERROR = -1,
@@ -92,6 +100,49 @@ static auto HASH(const char * str, size_t len, uint64_t seed, uint64_t & a, uint
     BOB_MIX(a, b, c)
 }
 
+static auto HASH(const char * buf, size_t len) -> uint64_t {
+    const auto * data = reinterpret_cast<const uint8_t *>(buf);
+    const uint64_t m = 0xc6a4a7935bd1e995;
+    const int r = 47;
+
+    uint64_t h = len * m;
+
+    auto get64bit = [](const uint8_t * v) -> uint64_t {
+        return (uint64_t)v[0] | ((uint64_t)v[1] << 8) | ((uint64_t)v[2] << 16) | ((uint64_t)v[3] << 24) |
+               ((uint64_t)v[4] << 32) | ((uint64_t)v[5] << 40) | ((uint64_t)v[6] << 48) | ((uint64_t)v[7] << 56);
+    };
+
+    while (len >= 8){
+        uint64_t k = get64bit(data);
+
+        k *= m;
+        k ^= k >> r;
+        k *= m;
+
+        h ^= k;
+        h *= m;
+        data += 8;
+        len -= 8;
+    }
+
+    switch(len & 7) {
+        case 7: h ^= uint64_t(data[6]) << 48;
+        case 6: h ^= uint64_t(data[5]) << 40;
+        case 5: h ^= uint64_t(data[4]) << 32;
+        case 4: h ^= uint64_t(data[3]) << 24;
+        case 3: h ^= uint64_t(data[2]) << 16;
+        case 2: h ^= uint64_t(data[1]) << 8;
+        case 1: h ^= uint64_t(data[0]);
+            h *= m;
+    }
+
+    h ^= h >> r;
+    h *= m;
+    h ^= h >> r;
+
+    return h;
+}
+
 template<typename ValueType>
 struct IndexUtils {
     static auto log2(const ValueType & x) -> uint64_t;
@@ -100,9 +151,27 @@ struct IndexUtils {
 
     static auto maskCheckLen(const ValueType & x, const uint64_t & len) -> ValueType;
 
-    /// |KeyNotFound| will be returned as the result if key not found
+    /// |key_not_found| will be returned as the result if key not found
     static constexpr ValueType KeyNotFound = static_cast<ValueType>(-1);
+
+    static auto RawBuffer(ValueType & value, size_t * length) -> std::unique_ptr<char>;
 };
+
+template<typename ValueType>
+auto IndexUtils<ValueType>::RawBuffer(ValueType & value, size_t * length) -> std::unique_ptr<char> {
+    auto ret = std::make_unique<char>(sizeof(ValueType));
+    *length = sizeof(ValueType);
+    memcpy(ret.get(), &value, length);
+    return ret;
+}
+
+template<>
+inline auto IndexUtils<std::string>::RawBuffer(std::string & value, size_t * length) -> std::unique_ptr<char> {
+    *length = value.size();
+    auto ret = std::make_unique<char>(value.size());
+    memcpy(ret.get(), value.data(), value.size());
+    return ret;
+}
 
 template<typename ValueType>
 auto IndexUtils<ValueType>::log2(const ValueType & x) -> uint64_t {
