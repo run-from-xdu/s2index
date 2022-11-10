@@ -18,20 +18,12 @@ struct FlushMemtableTask : public Task {
           block_num_(block_num),
           file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num_)) {}
 
-    ~FlushMemtableTask() {
+    ~FlushMemtableTask() override {
         // TODO
     }
 
     Status Execute() override {
         return Status::SUCCESS;
-    }
-
-    void SetPreExecute(std::function<void()> pre_exec) override {
-
-    }
-
-    void SetPostExecute(std::function<void()> post_exec) override {
-
     }
 
     std::unordered_map<KeyType, ValueType> candidate_;

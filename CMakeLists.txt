@@ -56,6 +56,9 @@ target_link_libraries(index_common_test GTest::gtest_main)
 add_executable(index_block_test test/index_block_test.cpp ${libs2index_src})
 target_link_libraries(index_block_test GTest::gtest_main)
 
+add_executable(scheduler_test test/scheduler_test.cpp ${libs2index_src})
+target_link_libraries(scheduler_test GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(
         file_manager_test
