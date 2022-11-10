@@ -16,11 +16,22 @@ struct FlushMemtableTask : public Task {
     explicit FlushMemtableTask(const std::unordered_map<KeyType, ValueType> & candidate, uint64_t block_num)
         : candidate_(candidate),
           block_num_(block_num),
-          file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num)) {}
+          seed_(0x12345678),
+          fp_bits_(0),
+          file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num)) {
+    }
 
     ~FlushMemtableTask() override {}
 
+    void SetAcceptor(std::unique_ptr<IndexArchivedFile<KeyType, ValueType>> & acc_1, std::vector<IndexBlock<ValueType>> & acc_2) {
+        SetPostExecute([this, &acc_1, &acc_2]{
+            acc_1 = std::move(file_handle_);
+            acc_2 = std::move(blocks_);
+        });
+    }
+
     Status Execute() override {
+        /// TODO: multiple partitions
         file_handle_ = std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num_);
         for (auto iter = candidate_.begin(); iter != candidate_.end(); ++iter) {
             size_t partition = 0;
@@ -71,7 +82,7 @@ struct FlushMemtableTask : public Task {
             for (size_t j = 0; j < data.size(); ++j) {
                 size_t length = 0;
                 auto buf = IndexUtils<KeyType>::RawBuffer(data[j].first, &length);
-                ies.emplace_back(IndexEdge<ValueType>(buf.get() + sizeof(uint64_t), length - sizeof(uint64_t), data[j].second, seed));
+                ies.emplace_back(IndexEdge<ValueType>(buf.get(), length, data[j].second, seed));
             }
             if (block.TryBuild(ies, seed, fp_bits) == Status::SUCCESS) {
                 return Status::SUCCESS;

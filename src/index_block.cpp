@@ -64,7 +64,7 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
 
     /// average bit usage per value (after normalization)
     bits_occupied_by_value_ = IndexUtils<ValueType>::log2(max_value_ - min_value_);
-    std::cout << "Value Bits: " << bits_occupied_by_value_ << std::endl;
+    //std::cout << "Value Bits: " << bits_occupied_by_value_ << std::endl;
     /// number of vertices
     num_v_ = static_cast<uint64_t>(entry_num_ * kScale / double(NumHashFunctions) + intercept);
 
