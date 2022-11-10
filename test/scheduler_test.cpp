@@ -3,6 +3,7 @@
 
 #include "../src/scheduler.hpp"
 #include "../src/index_common.hpp"
+#include "../src/task_flush_memtable.hpp"
 
 namespace ssindex {
 
@@ -42,6 +43,20 @@ TEST(TestScheduler, Basic) {
         });
         s.ScheduleTask(std::move(task));
     }
+
+    s.Wait();
+    s.Stop();
+
+    std::cout << "SUCCESS" << std::endl;
+}
+
+TEST(TestScheduler, FlushMemtable) {
+    ssindex::Scheduler s{1};
+
+    std::unordered_map<std::string, uint64_t> candidate{};
+    uint64_t partition_num = 8;
+    auto task = std::make_unique<ssindex::FlushMemtableTask<std::string, uint64_t>>(candidate, partition_num);
+    s.ScheduleTask(std::move(task));
 
     s.Wait();
     s.Stop();
