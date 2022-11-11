@@ -13,15 +13,17 @@ namespace ssindex {
 
 template<typename KeyType, typename ValueType>
 struct FlushMemtableTask : public Task {
-    explicit FlushMemtableTask(const std::unordered_map<KeyType, ValueType> & candidate, uint64_t block_num)
+    explicit FlushMemtableTask(const std::unordered_map<KeyType, ValueType> & candidate,
+                               uint64_t block_num, std::function<uint64_t(const KeyType &)> partitioner)
         : candidate_(candidate),
           block_num_(block_num),
           seed_(0x12345678),
           fp_bits_(0),
-          file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num)) {
+          file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num)),
+          partitioner_(partitioner) {
     }
 
-    ~FlushMemtableTask() override {}
+    ~FlushMemtableTask() override = default;
 
     void SetAcceptor(std::unique_ptr<IndexArchivedFile<KeyType, ValueType>> & acc_1, std::vector<IndexBlock<ValueType>> & acc_2) {
         SetPostExecute([this, &acc_1, &acc_2]{
@@ -34,7 +36,7 @@ struct FlushMemtableTask : public Task {
         /// TODO: multiple partitions
         file_handle_ = std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num_);
         for (auto iter = candidate_.begin(); iter != candidate_.end(); ++iter) {
-            size_t partition = 0;
+            auto partition = static_cast<size_t>(partitioner_(iter->first));
             auto s = file_handle_->WriteData(partition, iter->first, iter->second);
             if (s != Status::SUCCESS) {
                 return s;
@@ -103,6 +105,8 @@ struct FlushMemtableTask : public Task {
     uint64_t seed_;
 
     uint64_t fp_bits_;
+
+    std::function<uint64_t(const KeyType &)> partitioner_;
 };
 
 }  // namespace ssindex
