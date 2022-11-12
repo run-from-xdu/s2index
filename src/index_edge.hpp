@@ -11,8 +11,8 @@ template<typename ValueType>
 struct IndexEdge {
     explicit IndexEdge() : value_(0) {}
 
-    explicit IndexEdge(const char * str, const size_t len, const ValueType & code, const uint64_t seed)
-        : value_(code) {
+    explicit IndexEdge(const char * str, const size_t len, const ValueType & value, const uint64_t seed)
+        : value_(value) {
         HASH(str, len, seed, v_[0], v_[1], v_[2]);
     }
 

@@ -16,15 +16,22 @@ static auto FetchNextFileName() -> std::string {
     return GetFullPath(std::to_string(file_sequence_number.fetch_add(1)));
 }
 
+static std::atomic_uint64_t memtable_sequence_number = 0;
+static auto FetchMemtableId() -> uint64_t {
+    return memtable_sequence_number.fetch_add(1);
+}
+
 using WriteBuffer = const char *;
 using ReadBuffer = char *;
 
 /// Number of Hash in IndexBlock
 static constexpr size_t NumHashFunctions = 3;
 /// Threshold of flushing memtable to the disk
-static constexpr size_t MemtableFlushThreshold = 1000000;
+static constexpr size_t MemtableFlushThreshold = 1000;
 /// Default number of partitions
 static constexpr uint64_t DefaultPartitionNum = 32;
+/// Default false positive validation bits
+static constexpr uint64_t DefaultFpBits = 0;
 
 enum Status : int {
     ERROR = -1,
@@ -154,11 +161,11 @@ struct IndexUtils {
     /// |key_not_found| will be returned as the result if key not found
     static constexpr ValueType KeyNotFound = static_cast<ValueType>(-1);
 
-    static auto RawBuffer(ValueType & value, size_t * length) -> std::unique_ptr<char>;
+    static auto RawBuffer(const ValueType & value, size_t * length) -> std::unique_ptr<char>;
 };
 
 template<typename ValueType>
-auto IndexUtils<ValueType>::RawBuffer(ValueType & value, size_t * length) -> std::unique_ptr<char> {
+auto IndexUtils<ValueType>::RawBuffer(const ValueType & value, size_t * length) -> std::unique_ptr<char> {
     auto ret = std::make_unique<char>(sizeof(ValueType));
     *length = sizeof(ValueType);
     memcpy(ret.get(), &value, length);
@@ -166,7 +173,7 @@ auto IndexUtils<ValueType>::RawBuffer(ValueType & value, size_t * length) -> std
 }
 
 template<>
-inline auto IndexUtils<std::string>::RawBuffer(std::string & value, size_t * length) -> std::unique_ptr<char> {
+inline auto IndexUtils<std::string>::RawBuffer(const std::string & value, size_t * length) -> std::unique_ptr<char> {
     *length = value.size();
     auto ret = std::make_unique<char>(value.size());
     memcpy(ret.get(), value.data(), value.size());

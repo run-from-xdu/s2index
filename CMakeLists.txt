@@ -19,6 +19,7 @@ set(libs2index_src
     src/bitvec.hpp
         src/scheduler.hpp
         src/task_flush_memtable.hpp
+        src/task_compaction.hpp
 )
 
 
@@ -58,6 +59,9 @@ target_link_libraries(index_block_test GTest::gtest_main)
 
 add_executable(scheduler_test test/scheduler_test.cpp ${libs2index_src})
 target_link_libraries(scheduler_test GTest::gtest_main)
+
+add_executable(e2e_test test/e2e_test.cpp ${libs2index_src})
+target_link_libraries(e2e_test GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(

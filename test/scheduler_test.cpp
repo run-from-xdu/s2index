@@ -61,7 +61,7 @@ TEST(TestScheduler, FlushMemtable) {
     auto partitioner = [&partition_num](const std::string & key) -> uint64_t {
         return ssindex::HASH(key.data(), key.size()) % partition_num;
     };
-    auto task = std::make_unique<ssindex::FlushMemtableTask<std::string, uint64_t>>(candidate, partition_num, partitioner);
+    auto task = std::make_unique<ssindex::FlushMemtableTask<std::string, uint64_t>>(candidate, 1, partition_num, partitioner);
     std::vector<ssindex::IndexBlock<uint64_t>> blks{};
     std::unique_ptr<ssindex::IndexArchivedFile<std::string, uint64_t>> file{};
     task->SetAcceptor(file, blks);

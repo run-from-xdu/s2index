@@ -2,6 +2,10 @@
 
 #include <string>
 #include <utility>
+#include <mutex>
+#include <shared_mutex>
+#include <vector>
+#include <queue>
 
 #include "index_archived_file.hpp"
 #include "index_block.hpp"
@@ -20,21 +24,55 @@ class SsIndex {
 public:
     static constexpr ValueType key_not_found = IndexUtils<ValueType>::KeyNotFound;
 
-    using Memtable = std::unordered_map<KeyType, ValueType>;
+    //using MemtableData = std::unordered_map<KeyType, ValueType>;
+    using MemtableData = std::shared_ptr<std::unordered_map<KeyType, ValueType>>;
+
+    struct Memtable {
+        uint64_t id_;
+        MemtableData data_;
+    };
 
     explicit SsIndex(std::string directory)
         : working_directory_(std::move(directory)),
           seed_(0x12345678),
+          fp_bits_(DefaultFpBits),
+          scheduler_(new Scheduler(1)),
+          memtable_(std::move(Memtable{FetchMemtableId(), std::make_shared<std::unordered_map<KeyType, ValueType>>()})),
           partition_num_(DefaultPartitionNum) {}
 
-    auto Set(const KeyType & key, const ValueType & value);
+    ~SsIndex() {
+        scheduler_->Stop();
+    }
+
+    void Set(const KeyType & key, const ValueType & value);
 
     auto Get(const KeyType & key) -> ValueType;
 
-private:
     inline uint64_t GetBlockPartition(const char * kbuf, const size_t klen) {
         return HASH(kbuf, klen) % partition_num_;
     }
+
+    void WaitTaskComplete() {
+        scheduler_->Wait();
+    }
+
+    void PrintInfo() {
+        std::cout << "[Memory]\nMemtable_" << memtable_.id_ << " | Entry Num: " << memtable_.data_.get()->size() << std::endl;
+        std::cout << "------------" << std::endl;
+        for (auto iter = index_blocks_.begin(); iter != index_blocks_.end(); iter++) {
+            for (auto it = iter->begin(); it != iter->end(); it++) {
+                std::cout << it->GetFootprint() << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << "[Disk]" << std::endl;
+        for (auto iter = files_.begin(); iter != files_.end(); iter++) {
+            iter->get()->PrintInfo();
+            std::cout << "------------" << std::endl;
+        }
+    }
+
+private:
 
     auto FlushAndBuildIndexBlocks() -> Status;
 
@@ -46,29 +84,38 @@ private:
     /// by the index
     std::string working_directory_;
 
-    /// Archived files ｜ TODO: replace with the real implementation
-    std::vector<std::unique_ptr<IndexArchivedFile<KeyType, ValueType>>> files_;
-
     /// In-memory mutable hashtable
     Memtable memtable_;
+    std::shared_mutex memtable_mutex_;
 
     /// In-memory immutable hashtable waiting to be flushed
     std::vector<Memtable> waiting_queue_;
-    std::mutex waiting_queue_mutex_;
+    std::shared_mutex waiting_queue_mutex_;
 
-//    auto FetchFlushCandidate() -> Memtable {
+//    auto FetchFlushCandidate() -> MemtableData {
 //        std::lock_guard<std::mutex> latch{waiting_queue_mutex_};
+//        waiting_queue_.push_back(memtable_);
 //
 //    }
 
     /// Index blocks
     std::vector<std::vector<IndexBlock<ValueType>>> index_blocks_;
+    /// Archived files ｜ TODO: replace with the real implementation
+    std::vector<std::unique_ptr<IndexArchivedFile<KeyType, ValueType>>> files_;
+    /// lock for both two members above
+    std::shared_mutex immutable_part_mutex_;
 
     /// Seed
     uint64_t seed_;
 
+    /// False positive validation bits
+    uint64_t fp_bits_;
+
     /// Number of partitions
     uint64_t partition_num_;
+
+    /// Task scheduler
+    Scheduler * scheduler_;
 };
 
 }  // namespace ssindex

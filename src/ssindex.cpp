@@ -1,44 +1,89 @@
 #include "ssindex.hpp"
 #include "index_common.hpp"
+#include "task_flush_memtable.hpp"
 
 namespace ssindex {
 
 template<typename KeyType, typename ValueType>
-auto SsIndex<KeyType, ValueType>::Set(const KeyType &key, const ValueType &value) {
-    memtable_.insert_or_assign(key, value);
-    if (memtable_.size() == MemtableFlushThreshold) {
-        /// TODO: schedule a flush task and reset the memtable
+void SsIndex<KeyType, ValueType>::Set(const KeyType & key, const ValueType & value) {
+    std::lock_guard<std::shared_mutex> w_latch{memtable_mutex_};
+    memtable_.data_->insert_or_assign(key, value);
+    if (memtable_.data_->size() == MemtableFlushThreshold) {
+        /// schedule a flush task and reset the memtable
+        std::lock_guard<std::shared_mutex> q_r_latch{waiting_queue_mutex_};
+        waiting_queue_.emplace_back(std::move(memtable_));
+        memtable_.id_ = FetchMemtableId();
+        memtable_.data_ = std::make_shared<std::unordered_map<KeyType, ValueType>>();
+        std::cout << "Enqueue Immutable | Current Size: " << waiting_queue_.size() << std::endl;
+        auto partitioner = [this](const KeyType & key) -> uint64_t {
+            size_t len = 0;
+            auto buf = IndexUtils<KeyType>::RawBuffer(key, &len);
+            return GetBlockPartition(buf.get(), len);
+        };
+
+        auto task = std::make_unique<FlushMemtableTask<KeyType, ValueType>>(*waiting_queue_.back().data_, waiting_queue_.back().id_, partition_num_, partitioner, seed_, fp_bits_);
+        auto task_id = task->memtable_id_;
+        auto pre = [task_id]() {
+            std::cout << "Start flushing memtable, id: " << task_id << std::endl;
+        };
+        //auto memtable_id = task->memtable_id_;
+        auto * raw_ptr = task.get();
+        auto updateIndex = [this, raw_ptr]() {
+            std::lock_guard<std::shared_mutex> q_w_latch{waiting_queue_mutex_};
+            for (auto iter = waiting_queue_.begin(); iter != waiting_queue_.end(); iter++) {
+                if (iter->id_ == raw_ptr->memtable_id_) {
+                    waiting_queue_.erase(iter);
+                    break;
+                }
+            }
+
+            std::lock_guard<std::shared_mutex> imm_w_latch{immutable_part_mutex_};
+            files_.emplace_back(std::move(raw_ptr->file_handle_));
+            index_blocks_.emplace_back(std::move(raw_ptr->blocks_));
+        };
+        task->SetPreExecute(pre);
+        task->SetPostExecute(updateIndex);
+        scheduler_->ScheduleTask(std::move(task));
     }
 }
 
 template<typename KeyType, typename ValueType>
 auto SsIndex<KeyType, ValueType>::Get(const KeyType & key) -> ValueType {
-    if (auto iter = memtable_.find(key); iter != memtable_.end()) {
+    std::shared_lock<std::shared_mutex> mem_r_latch{memtable_mutex_};
+    if (auto iter = memtable_.data_->find(key); iter != memtable_.data_->end()) {
         return iter->second;
     }
+    mem_r_latch.unlock();
 
-    char * key_buf = nullptr;
+    std::shared_lock<std::shared_mutex> q_r_latch{waiting_queue_mutex_};
+    for (auto & imm : waiting_queue_) {
+        if (auto iter = imm.data_->find(key); iter != imm.data_->end()) {
+            return iter->second;
+        }
+    }
+    q_r_latch.unlock();
+
     size_t key_buf_len = 0;
-    Codec<KeyType>::EncodeValue(key, key_buf, static_cast<size_t>(-1), &key_buf_len);
-    IndexEdge<uint64_t> ie{key_buf + sizeof(uint64_t), key_buf_len - sizeof(uint64_t), 0, seed_};
-    uint64_t partition = GetBlockPartition(key_buf + sizeof(uint64_t), key_buf_len - sizeof(uint64_t));
+    auto buf = IndexUtils<KeyType>::RawBuffer(key, &key_buf_len);
+    uint64_t partition = GetBlockPartition(buf.get(), key_buf_len);
+    IndexEdge<ValueType> ie{buf.get(), key_buf_len, 0, seed_};
+
+    std::shared_lock<std::shared_mutex> imm_r_latch{immutable_part_mutex_};
     for (size_t i = index_blocks_.size() - 1; i >= 0; --i) {
         auto & batch = index_blocks_[i];
         auto & block = batch[partition];
         auto ret = block.GetValue(ie);
         if (ret != key_not_found) {
-            delete [] key_buf;
             return ret;
         }
     }
 
-    delete [] key_buf;
     return key_not_found;
 }
 
 template<typename KeyType, typename ValueType>
 auto SsIndex<KeyType, ValueType>::FlushAndBuildIndexBlocks() -> Status {
-    if (memtable_.empty()) {
+    if (memtable_.data_->empty()) {
         return Status::SUCCESS;
     }
 

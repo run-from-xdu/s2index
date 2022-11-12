@@ -14,11 +14,17 @@ namespace ssindex {
 template<typename KeyType, typename ValueType>
 struct FlushMemtableTask : public Task {
     explicit FlushMemtableTask(const std::unordered_map<KeyType, ValueType> & candidate,
-                               uint64_t block_num, std::function<uint64_t(const KeyType &)> partitioner)
+                               uint64_t memtable_id,
+                               uint64_t block_num,
+                               std::function<uint64_t(const KeyType &)> partitioner,
+                               uint64_t seed = 0x12345678,
+                               uint64_t fp_bits = 0
+                               )
         : candidate_(candidate),
+          memtable_id_(memtable_id),
           block_num_(block_num),
-          seed_(0x12345678),
-          fp_bits_(0),
+          seed_(seed),
+          fp_bits_(fp_bits),
           file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num)),
           partitioner_(partitioner) {
     }
@@ -33,7 +39,6 @@ struct FlushMemtableTask : public Task {
     }
 
     Status Execute() override {
-        /// TODO: multiple partitions
         file_handle_ = std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num_);
         for (auto iter = candidate_.begin(); iter != candidate_.end(); ++iter) {
             auto partition = static_cast<size_t>(partitioner_(iter->first));
@@ -94,11 +99,14 @@ struct FlushMemtableTask : public Task {
         return Status::ERROR;
     }
 
+    /// input
     std::unordered_map<KeyType, ValueType> candidate_;
 
+    /// outputs
     std::unique_ptr<IndexArchivedFile<KeyType, ValueType>> file_handle_;
-
     std::vector<IndexBlock<ValueType>> blocks_;
+
+    uint64_t memtable_id_;
 
     uint64_t block_num_;
 
