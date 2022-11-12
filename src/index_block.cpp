@@ -41,6 +41,9 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
               uint64_t seed,
               uint64_t fp_bits) -> Status {
     entry_num_ = static_cast<uint64_t>(index_edges.size());
+    if (entry_num_ == 0) {
+        return Status::SUCCESS;
+    }
     seed_ = seed;
     bits_occupied_by_fp_ = fp_bits;
 
@@ -64,7 +67,9 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
 
     /// average bit usage per value (after normalization)
     bits_occupied_by_value_ = IndexUtils<ValueType>::log2(max_value_ - min_value_);
-    //std::cout << "Value Bits: " << bits_occupied_by_value_ << std::endl;
+    if (bits_occupied_by_value_ == 0) bits_occupied_by_value_ = 1;
+//    std::cout << max_value_ << " " << min_value_ << std::endl;
+//    std::cout << "Value Bits: " << bits_occupied_by_value_ << std::endl;
     /// number of vertices
     num_v_ = static_cast<uint64_t>(entry_num_ * kScale / double(NumHashFunctions) + intercept);
 
@@ -174,10 +179,12 @@ auto IndexBlock<ValueType>::TryBuild(std::vector<IndexEdge<ValueType>> & index_e
 
     assert(q.empty());
     data_.Resize(num_v_ * bits_per_value_with_fp * NumHashFunctions);
+    //std::cout << num_v_ << " " << bits_per_value_with_fp << " " << NumHashFunctions << std::endl;
 
     uint64_t block_size = bits_per_value_with_fp;
     BitVec<uint64_t> visited_vertices(assign_num * NumHashFunctions);
     std::reverse(extracted_edges.begin(),  extracted_edges.end());
+    //std::cout << ".........." << std::endl;
     for (auto & extracted_edge : extracted_edges) {
         const uint64_t v = extracted_edge.first;
         uint64_t key_index = v / points_per_entry;

@@ -95,6 +95,7 @@ struct FlushMemtableTask : public Task {
                 return Status::SUCCESS;
             }
             seed += 114514;
+            //block = IndexBlock<ValueType>{};
         }
         return Status::ERROR;
     }

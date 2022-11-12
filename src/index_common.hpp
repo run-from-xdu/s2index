@@ -27,7 +27,7 @@ using ReadBuffer = char *;
 /// Number of Hash in IndexBlock
 static constexpr size_t NumHashFunctions = 3;
 /// Threshold of flushing memtable to the disk
-static constexpr size_t MemtableFlushThreshold = 1000;
+static constexpr size_t MemtableFlushThreshold = 7000;
 /// Default number of partitions
 static constexpr uint64_t DefaultPartitionNum = 32;
 /// Default false positive validation bits
@@ -182,7 +182,7 @@ inline auto IndexUtils<std::string>::RawBuffer(const std::string & value, size_t
 
 template<typename ValueType>
 auto IndexUtils<ValueType>::log2(const ValueType & x) -> uint64_t {
-    return 0;
+    return 64 - __builtin_clzll(x);
 }
 
 template<>

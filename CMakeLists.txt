@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(s2index)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_FLAGS "-std=c++2a -g")
 set(libs2index_src
     src/file_manager.hpp
     src/file_manager.cpp
