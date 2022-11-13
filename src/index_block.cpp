@@ -7,7 +7,7 @@ namespace ssindex {
 
 template<typename ValueType>
 auto IndexBlock<ValueType>::GetValue(const IndexEdge<ValueType> & ie) const -> ValueType {
-    if (data_.BitsCount() == 0) {
+    if (data_.Empty()) {
         return IndexUtils<ValueType>::KeyNotFound;
     }
 

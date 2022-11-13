@@ -14,9 +14,16 @@ class BitVec {
 public:
     static constexpr size_t BitsNum = 64;
 
-    explicit BitVec() = default;
+    explicit BitVec() : data_(std::vector<uint64_t>{}) {}
 
-    explicit BitVec(size_t size) { Resize(size); }
+    explicit BitVec(size_t size) {
+        data_ = std::move(std::vector<uint64_t>(size));
+        fill(data_.begin(), data_.end(), 0);
+    }
+
+    auto Empty() const -> bool {
+        return data_.empty();
+    }
 
     auto Resize(size_t new_size) {
         data_.resize((new_size + BitsNum - 1) / BitsNum);

@@ -58,8 +58,21 @@ public:
         scheduler_->Wait();
     }
 
+    uint64_t GetUsage() {
+        uint64_t sum = 0;
+        for (auto iter = index_blocks_.begin(); iter != index_blocks_.end(); iter++) {
+            for (size_t i = 0; i < iter->size(); i++) {
+                sum += iter->at(i).GetFootprint();
+            }
+        }
+        return sum;
+    }
+
     void PrintInfo() {
         std::cout << "[Memory]\nMemtable_" << memtable_.id_ << " | Entry Num: " << memtable_.data_.get()->size() << std::endl;
+        for (auto iter = waiting_queue_.begin(); iter != waiting_queue_.end(); iter++) {
+            std::cout << "Imm | " << iter->id_ << std::endl;
+        }
         std::cout << "------------" << std::endl;
         for (auto iter = index_blocks_.begin(); iter != index_blocks_.end(); iter++) {
             for (auto it = iter->begin(); it != iter->end(); it++) {

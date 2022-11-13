@@ -27,11 +27,11 @@ using ReadBuffer = char *;
 /// Number of Hash in IndexBlock
 static constexpr size_t NumHashFunctions = 3;
 /// Threshold of flushing memtable to the disk
-static constexpr size_t MemtableFlushThreshold = 7000;
+static constexpr size_t MemtableFlushThreshold = 10000;
 /// Default number of partitions
-static constexpr uint64_t DefaultPartitionNum = 32;
+static constexpr uint64_t DefaultPartitionNum = 8;
 /// Default false positive validation bits
-static constexpr uint64_t DefaultFpBits = 0;
+static constexpr uint64_t DefaultFpBits = 2;
 
 enum Status : int {
     ERROR = -1,

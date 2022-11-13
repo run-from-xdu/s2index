@@ -66,17 +66,24 @@ auto SsIndex<KeyType, ValueType>::Get(const KeyType & key) -> ValueType {
     size_t key_buf_len = 0;
     auto buf = IndexUtils<KeyType>::RawBuffer(key, &key_buf_len);
     uint64_t partition = GetBlockPartition(buf.get(), key_buf_len);
+    assert(partition >= 0 && partition < partition_num_);
     IndexEdge<ValueType> ie{buf.get(), key_buf_len, 0, seed_};
 
     std::shared_lock<std::shared_mutex> imm_r_latch{immutable_part_mutex_};
-    for (size_t i = index_blocks_.size() - 1; i >= 0; --i) {
-        auto & batch = index_blocks_[i];
-        auto & block = batch[partition];
-        auto ret = block.GetValue(ie);
+    for (auto iter = index_blocks_.rbegin(); iter != index_blocks_.rend(); iter++) {
+        //std::cout << iter->size() << std::endl;
+        assert(iter->size() == partition_num_);
+        auto ret = iter->at(partition).GetValue(ie);
         if (ret != key_not_found) {
             return ret;
         }
     }
+//    for (size_t i = index_blocks_.size() - 1; i >= 0; --i) {
+//        auto ret = index_blocks_[i][partition].GetValue(ie);
+//        if (ret != key_not_found) {
+//            return ret;
+//        }
+//    }
 
     return key_not_found;
 }
