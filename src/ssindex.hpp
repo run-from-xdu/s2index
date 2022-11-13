@@ -116,7 +116,7 @@ private:
     /// Index blocks
     std::vector<std::vector<IndexBlock<ValueType>>> index_blocks_;
     /// Archived files ｜ TODO: replace with the real implementation
-    std::vector<std::unique_ptr<IndexArchivedFile<KeyType, ValueType>>> files_;
+    std::vector<std::shared_ptr<IndexArchivedFile<KeyType, ValueType>>> files_;
     /// lock for both two members above
     std::shared_mutex immutable_part_mutex_;
 

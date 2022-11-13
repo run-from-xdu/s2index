@@ -25,13 +25,13 @@ struct FlushMemtableTask : public Task {
           block_num_(block_num),
           seed_(seed),
           fp_bits_(fp_bits),
-          file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextArchivedFileName(), block_num)),
+          file_handle_(std::make_shared<IndexArchivedFile<KeyType, ValueType>>(FetchNextArchivedFileName(), block_num)),
           partitioner_(partitioner) {
     }
 
     ~FlushMemtableTask() override = default;
 
-    void SetAcceptor(std::unique_ptr<IndexArchivedFile<KeyType, ValueType>> & acc_1, std::vector<IndexBlock<ValueType>> & acc_2) {
+    void SetAcceptor(std::shared_ptr<IndexArchivedFile<KeyType, ValueType>> & acc_1, std::vector<IndexBlock<ValueType>> & acc_2) {
         SetPostExecute([this, &acc_1, &acc_2]{
             acc_1 = std::move(file_handle_);
             acc_2 = std::move(blocks_);
@@ -104,7 +104,7 @@ struct FlushMemtableTask : public Task {
     std::unordered_map<KeyType, ValueType> candidate_;
 
     /// outputs
-    std::unique_ptr<IndexArchivedFile<KeyType, ValueType>> file_handle_;
+    std::shared_ptr<IndexArchivedFile<KeyType, ValueType>> file_handle_;
     std::vector<IndexBlock<ValueType>> blocks_;
 
     uint64_t memtable_id_;

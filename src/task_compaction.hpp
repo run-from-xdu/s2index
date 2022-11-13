@@ -13,27 +13,27 @@ namespace ssindex {
 
 template<typename KeyType, typename ValueType>
 struct CompactionTask : public Task {
-    using FileHandle = std::unique_ptr<IndexArchivedFile<KeyType, ValueType>>;
+    using FileHandlePtr = std::shared_ptr<IndexArchivedFile<KeyType, ValueType>>;
     using Blocks = std::vector<IndexBlock<ValueType>>;
-    using Batch = std::pair<Blocks, FileHandle>;
+    using Batch = std::pair<Blocks, FileHandlePtr>;
 
-    explicit CompactionTask(const std::vector<Batch> & candidate,
+    explicit CompactionTask(const std::vector<Batch> & candidates,
                                uint64_t block_num,
-                               std::function<uint64_t(const KeyType &)> partitioner,
+                               /*std::function<uint64_t(const KeyType &)> partitioner,*/
                                uint64_t seed = 0x12345678,
                                uint64_t fp_bits = 0
                                )
-            : candidate_(candidate),
+            : candidates_(candidates),
               block_num_(block_num),
               seed_(seed),
               fp_bits_(fp_bits),
-              file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextArchivedFileName(), block_num)),
+              file_handle_(std::make_shared<IndexArchivedFile<KeyType, ValueType>>(FetchNextArchivedFileName(), block_num))
               /*partitioner_(partitioner)*/ {
     }
 
     ~CompactionTask() override = default;
 
-    void SetAcceptor(std::unique_ptr<IndexArchivedFile<KeyType, ValueType>> & acc_1, std::vector<IndexBlock<ValueType>> & acc_2) {
+    void SetAcceptor(std::shared_ptr<IndexArchivedFile<KeyType, ValueType>> & acc_1, std::vector<IndexBlock<ValueType>> & acc_2) {
         SetPostExecute([this, &acc_1, &acc_2]{
             acc_1 = std::move(file_handle_);
             acc_2 = std::move(blocks_);
@@ -41,6 +41,7 @@ struct CompactionTask : public Task {
     }
 
     Status Execute() override {
+        std::cout << "/// Compaction Start ...... ///" << std::endl;
         /// build each partition one by one
         for (uint64_t part = 0; part < block_num_; ++part) {
             /// for a single partition, load the data, build blocks & new file
@@ -48,7 +49,7 @@ struct CompactionTask : public Task {
             std::vector<std::pair<KeyType, ValueType>> part_raw_data{};
             for (auto file_iter = candidates_.begin(); file_iter != candidates_.end(); ++file_iter) {
                 IndexArchivedFile<KeyType, ValueType> * file_handle_ptr = file_iter->second.get();
-                auto data_collector = [](const std::pair<KeyType, ValueType> & entry) {
+                auto data_collector = [this, part](const std::pair<KeyType, ValueType> & entry) {
                     file_handle_->WriteData(part, entry.first, entry.second);
                 };
                 auto s = file_handle_ptr->ReadData(part, part_raw_data, data_collector);
@@ -61,9 +62,10 @@ struct CompactionTask : public Task {
             if (s != Status::SUCCESS) {
                 return s;
             }
-            blocks_.emplace_back(blk);
+            blocks_.emplace_back(part_blk);
         }
 
+        std::cout << "/// Compaction Finished ...... ///" << std::endl;
         return Status::SUCCESS;
     }
 
@@ -107,7 +109,7 @@ struct CompactionTask : public Task {
     std::vector<Batch> candidates_;
 
     /// outputs
-    FileHandle file_handle_;
+    FileHandlePtr file_handle_;
     Blocks blocks_;
 
     uint64_t block_num_;

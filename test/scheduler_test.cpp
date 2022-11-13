@@ -4,6 +4,7 @@
 #include "../src/scheduler.hpp"
 #include "../src/index_common.hpp"
 #include "../src/task_flush_memtable.hpp"
+#include "../src/task_compaction.hpp"
 
 namespace ssindex {
 
@@ -63,7 +64,55 @@ TEST(TestScheduler, FlushMemtable) {
     };
     auto task = std::make_unique<ssindex::FlushMemtableTask<std::string, uint64_t>>(candidate, 1, partition_num, partitioner);
     std::vector<ssindex::IndexBlock<uint64_t>> blks{};
-    std::unique_ptr<ssindex::IndexArchivedFile<std::string, uint64_t>> file{};
+    std::shared_ptr<ssindex::IndexArchivedFile<std::string, uint64_t>> file{};
+    task->SetAcceptor(file, blks);
+
+    s.ScheduleTask(std::move(task));
+    s.Wait();
+    s.Stop();
+
+    std::cout << "SUCCESS" << std::endl;
+
+    std::cout << blks.size() << std::endl;
+    file->PrintInfo();
+}
+
+TEST(TestScheduler, Compaction) {
+    ssindex::Scheduler s{1};
+    uint64_t partition_num = 8;
+
+//    using Blocks = std::vector<ssindex::IndexBlock<uint64_t>>;
+//    using FileHandle = std::unique_ptr<ssindex::IndexArchivedFile<std::string, uint64_t>>;
+//    using Batch = std::pair<Blocks, FileHandle>;
+    std::vector<ssindex::CompactionTask<std::string, uint64_t>::Blocks> blocks_s{};
+    std::vector<ssindex::CompactionTask<std::string, uint64_t>::FileHandlePtr> files{};
+    for (uint64_t times = 0; times < 10; times++)
+    {
+        std::unordered_map<std::string, uint64_t> candidate{};
+        for (uint64_t i = times * 1000; i < times * 1000 + 1000; ++i) {
+            candidate[std::to_string(i)] = i;
+        }
+        auto partitioner = [&partition_num](const std::string & key) -> uint64_t {
+            return ssindex::HASH(key.data(), key.size()) % partition_num;
+        };
+        auto task = std::make_unique<ssindex::FlushMemtableTask<std::string, uint64_t>>(candidate, 1, partition_num, partitioner);
+        std::vector<ssindex::IndexBlock<uint64_t>> blks{};
+        std::shared_ptr<ssindex::IndexArchivedFile<std::string, uint64_t>> file{};
+        task->SetAcceptor(file, blks);
+
+        s.ScheduleTask(std::move(task));
+        s.Wait();
+
+        blocks_s.emplace_back(std::move(blks));
+        files.emplace_back(std::move(file));
+    }
+
+    std::vector<ssindex::CompactionTask<std::string, uint64_t>::Batch> batches{};
+    for (size_t i = 0; i < 10; i++) batches.emplace_back(std::make_pair(std::move(blocks_s[i]), std::move(files[i])));
+
+    auto task = std::make_unique<ssindex::CompactionTask<std::string, uint64_t>>(batches, partition_num);
+    std::vector<ssindex::IndexBlock<uint64_t>> blks{};
+    std::shared_ptr<ssindex::IndexArchivedFile<std::string, uint64_t>> file{};
     task->SetAcceptor(file, blks);
 
     s.ScheduleTask(std::move(task));
