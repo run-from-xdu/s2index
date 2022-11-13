@@ -25,7 +25,7 @@ struct FlushMemtableTask : public Task {
           block_num_(block_num),
           seed_(seed),
           fp_bits_(fp_bits),
-          file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num)),
+          file_handle_(std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextArchivedFileName(), block_num)),
           partitioner_(partitioner) {
     }
 
@@ -39,7 +39,7 @@ struct FlushMemtableTask : public Task {
     }
 
     Status Execute() override {
-        file_handle_ = std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextFileName(), block_num_);
+        //file_handle_ = std::make_unique<IndexArchivedFile<KeyType, ValueType>>(FetchNextArchivedFileName(), block_num_);
         for (auto iter = candidate_.begin(); iter != candidate_.end(); ++iter) {
             auto partition = static_cast<size_t>(partitioner_(iter->first));
             auto s = file_handle_->WriteData(partition, iter->first, iter->second);

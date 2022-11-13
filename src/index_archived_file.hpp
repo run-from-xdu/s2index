@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <iostream>
+#include <functional>
 
 namespace ssindex {
 
@@ -50,7 +51,10 @@ public:
     auto WriteData(size_t partition_id, KeyType key, ValueType value) -> Status;
 
     /// Read all the data of the certain partition
-    auto ReadData(size_t partition_id, std::vector<std::pair<KeyType, ValueType>> & result) const -> Status;
+    auto ReadData(size_t partition_id,
+                  std::vector<std::pair<KeyType, ValueType>> & result,
+                  std::function<void(const std::pair<KeyType, ValueType> &)> predicate = nullptr
+                          ) const -> Status;
 
     /// Sync all data on the disk
     auto SyncData() {

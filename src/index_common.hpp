@@ -6,14 +6,14 @@
 
 namespace ssindex {
 
-static const std::string default_working_directory = "/tmp/temp_data/";
+static const std::string default_working_directory = "/tmp/ssindex/";
 static constexpr auto GetFullPath(const std::string & file_name) -> std::string {
     return default_working_directory + file_name;
 }
 
 static std::atomic_uint64_t file_sequence_number = 0;
-static auto FetchNextFileName() -> std::string {
-    return GetFullPath(std::to_string(file_sequence_number.fetch_add(1)));
+static auto FetchNextArchivedFileName() -> std::string {
+    return GetFullPath(std::to_string(file_sequence_number.fetch_add(1)) + ".arc");
 }
 
 static std::atomic_uint64_t memtable_sequence_number = 0;

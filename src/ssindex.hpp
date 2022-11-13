@@ -38,7 +38,9 @@ public:
           fp_bits_(DefaultFpBits),
           scheduler_(new Scheduler(1)),
           memtable_(std::move(Memtable{FetchMemtableId(), std::make_shared<std::unordered_map<KeyType, ValueType>>()})),
-          partition_num_(DefaultPartitionNum) {}
+          partition_num_(DefaultPartitionNum) {
+        std::filesystem::create_directory(working_directory_);
+    }
 
     ~SsIndex() {
         scheduler_->Stop();

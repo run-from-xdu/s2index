@@ -20,6 +20,7 @@ public:
             : file_name_(std::move(file_name)), next_id_(0) {
         /// initialize the underlying data file
         data_file_.open(file_name_, std::ios::binary | std::ios::in | std::ios::out | std::ios::app);
+        std::cout << "File Created | " << file_name_ << std::endl;
     }
 
     ~FileManager() {

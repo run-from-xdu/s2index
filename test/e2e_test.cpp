@@ -8,7 +8,8 @@ TEST(TestE2E, Flushing) {
         return f.good();
     };
     if (fileExists(ssindex::default_working_directory)) {
-        std::filesystem::remove(ssindex::default_working_directory);
+        //std::filesystem::remove(ssindex::default_working_directory);
+        std::filesystem::remove_all(ssindex::default_working_directory);
     }
 
     auto index = ssindex::SsIndex<std::string, uint64_t>(ssindex::default_working_directory);

@@ -33,8 +33,12 @@ auto IndexArchivedFile<KeyType, ValueType>::WriteData(size_t partition_id, KeyTy
 }
 
 template<typename KeyType, typename ValueType>
-auto IndexArchivedFile<KeyType, ValueType>::ReadData(size_t partition_id, std::vector<std::pair<KeyType, ValueType>> & result) const -> Status {
-    auto pageIterator = [](char * target_page, size_t start_pos, size_t end_pos, std::vector<std::pair<KeyType, ValueType>> & res) {
+auto IndexArchivedFile<KeyType, ValueType>::ReadData(
+        size_t partition_id,
+        std::vector<std::pair<KeyType, ValueType>> & result,
+        std::function<void(const std::pair<KeyType, ValueType> &)> predicate
+                ) const -> Status {
+    auto pageIterator = [predicate](char * target_page, size_t start_pos, size_t end_pos, std::vector<std::pair<KeyType, ValueType>> & res) {
         //std::cout << "Iterating Page " << start_pos << ", " << end_pos << std::endl;
         size_t curr_pos = start_pos;
         while (curr_pos < end_pos) {
@@ -42,6 +46,9 @@ auto IndexArchivedFile<KeyType, ValueType>::ReadData(size_t partition_id, std::v
             size_t span = 0;
             Codec<std::pair<KeyType, ValueType>>::DecodeValue(target_page + curr_pos, &entry, &span);
             curr_pos += span;
+            if (predicate) {
+                predicate(entry);
+            }
             res.emplace_back(entry);
         }
     };
