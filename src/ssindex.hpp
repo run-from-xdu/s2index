@@ -11,7 +11,103 @@
 #include "index_block.hpp"
 #include "scheduler.hpp"
 
+/// TODO: there are bunch of places using |IndexBlock| instead
+/// of |std::shared_ptr<IndexBlock>|, which causes many needless
+/// copies, and we need to change that afterwards.
+
 namespace ssindex {
+
+template<typename KeyType, typename ValueType>
+struct BatchItem {
+    using FileHandlePtr = std::shared_ptr<IndexArchivedFile<KeyType, ValueType>>;
+    using Blocks = std::vector<IndexBlock<ValueType>>;
+    using Batch = std::pair<Blocks, FileHandlePtr>;
+
+    Batch data_;
+
+    uint64_t id_;
+};
+
+template<typename KeyType, typename ValueType>
+struct BatchHolder {
+    using FileHandlePtr = typename BatchItem<KeyType, ValueType>::FileHandlePtr;
+    using Blocks = typename BatchItem<KeyType, ValueType>::Blocks;
+    using Batch = typename BatchItem<KeyType, ValueType>::Batch;
+    using Item = BatchItem<KeyType, ValueType>;
+
+    uint64_t next_id_;
+
+    explicit BatchHolder() : next_id_(0) {}
+
+    void AppendBatch(const FileHandlePtr & file, const Blocks & blocks) {
+        items_.emplace_back(Item{{blocks, file}, next_id_});
+        next_id_++;
+    }
+
+    void CommitCompaction(uint64_t start, size_t count, const FileHandlePtr & file, const Blocks & blocks) {
+        for (auto iter = items_.begin(); iter != items_.end(); iter++) {
+            if (iter->id_ == start) {
+                items_.erase(iter + 1, iter + count);
+                *iter = Item{{blocks, file}, next_id_};
+                next_id_++;
+            }
+        }
+    }
+
+    bool FindCompactionCandidates(uint64_t * start, size_t * count, std::vector<Batch> & candidates) {
+        bool need_compaction = false;
+        int current_level = -1;
+        size_t current_cnt = 0;
+        for (auto iter = items_.rbegin(); iter != items_.rend(); iter++) {
+            if (current_level == -1) {
+                current_level = iter->data_.first.at(0).level_;
+                current_cnt = 1;
+                continue;
+            }
+
+            if (current_level == iter->data_.first.at(0).level_) {
+                current_cnt++;
+                if (current_cnt == CompactionThreshold) {
+                    need_compaction = true;
+                    *start = iter->id_;
+                    *count = current_cnt;
+                    for (size_t i = 0; i < items_.size(); ++i) {
+                        if (items_[i].id_ == *start) {
+                            for (size_t j = 0; j < current_cnt; j++) {
+                                candidates.emplace_back(items_[i + j].data_);
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+            } else {
+                current_level = iter->data_.first.at(0).level_;
+                current_cnt = 1;
+            }
+        }
+
+        return need_compaction;
+    }
+
+    auto begin() -> decltype(auto) {
+        return items_.begin();
+    }
+
+    auto end() -> decltype(auto) {
+        return items_.end();
+    }
+
+    auto rbegin() -> decltype(auto) {
+        return items_.rbegin();
+    }
+
+    auto rend() -> decltype(auto) {
+        return items_.rend();
+    }
+
+    std::vector<Item> items_;
+};
 
 /// Space-Saving Index
 ///
@@ -60,9 +156,10 @@ public:
 
     uint64_t GetUsage() {
         uint64_t sum = 0;
-        for (auto iter = index_blocks_.begin(); iter != index_blocks_.end(); iter++) {
-            for (size_t i = 0; i < iter->size(); i++) {
-                sum += iter->at(i).GetFootprint();
+        for (auto iter = batch_holder_.rbegin(); iter != batch_holder_.rend(); iter++) {
+            auto & blocks = iter->data_.first;
+            for (size_t i = 0; i < blocks.size(); i++) {
+                sum += blocks.at(i).GetFootprint();
             }
         }
         return sum;
@@ -74,15 +171,18 @@ public:
             std::cout << "Imm | " << iter->id_ << std::endl;
         }
         std::cout << "------------" << std::endl;
-        for (auto iter = index_blocks_.begin(); iter != index_blocks_.end(); iter++) {
-            for (auto it = iter->begin(); it != iter->end(); it++) {
-                std::cout << it->GetFootprint() << " ";
+        for (auto iter = batch_holder_.rbegin(); iter != batch_holder_.rend(); iter++) {
+            auto & blocks = iter->data_.first;
+            std::cout << "Batch: ";
+            for (size_t i = 0; i < blocks.size(); i++) {
+                std::cout << blocks.at(i).GetFootprint() << " ";
             }
             std::cout << std::endl;
         }
         std::cout << "[Disk]" << std::endl;
-        for (auto iter = files_.begin(); iter != files_.end(); iter++) {
-            iter->get()->PrintInfo();
+        for (auto iter = batch_holder_.rbegin(); iter != batch_holder_.rend(); iter++) {
+            auto & file = iter->data_.second;
+            file->PrintInfo();
             std::cout << "------------" << std::endl;
         }
     }
@@ -107,18 +207,15 @@ private:
     std::vector<Memtable> waiting_queue_;
     std::shared_mutex waiting_queue_mutex_;
 
-//    auto FetchFlushCandidate() -> MemtableData {
-//        std::lock_guard<std::mutex> latch{waiting_queue_mutex_};
-//        waiting_queue_.push_back(memtable_);
-//
-//    }
+    BatchHolder<KeyType, ValueType> batch_holder_;
+    std::shared_mutex batch_holder_mutex_;
 
-    /// Index blocks
-    std::vector<std::vector<IndexBlock<ValueType>>> index_blocks_;
-    /// Archived files ｜ TODO: replace with the real implementation
-    std::vector<std::shared_ptr<IndexArchivedFile<KeyType, ValueType>>> files_;
-    /// lock for both two members above
-    std::shared_mutex immutable_part_mutex_;
+//    /// Index blocks
+//    std::vector<std::vector<IndexBlock<ValueType>>> index_blocks_;
+//    /// Archived files ｜ TODO: replace with the real implementation
+//    std::vector<std::shared_ptr<IndexArchivedFile<KeyType, ValueType>>> files_;
+//    /// lock for both two members above
+//    std::shared_mutex batch_holder_mutex_;
 
     /// Seed
     uint64_t seed_;

@@ -28,6 +28,8 @@ using ReadBuffer = char *;
 static constexpr size_t NumHashFunctions = 3;
 /// Threshold of flushing memtable to the disk
 static constexpr size_t MemtableFlushThreshold = 10000;
+/// Threshold of compaction
+static constexpr size_t CompactionThreshold = 4;
 /// Default number of partitions
 static constexpr uint64_t DefaultPartitionNum = 8;
 /// Default false positive validation bits

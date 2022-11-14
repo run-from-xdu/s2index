@@ -11,6 +11,8 @@
 
 namespace ssindex {
 
+/// TODO: the current implementation doesn't deal with multi-version garbage
+/// collection, we need to implement it later.
 template<typename KeyType, typename ValueType>
 struct CompactionTask : public Task {
     using FileHandlePtr = std::shared_ptr<IndexArchivedFile<KeyType, ValueType>>;
@@ -40,8 +42,9 @@ struct CompactionTask : public Task {
         });
     }
 
+    /// TODO: increase |level_| in new batch
     Status Execute() override {
-        std::cout << "/// Compaction Start ...... ///" << std::endl;
+        //std::cout << "/// Compaction Start ...... ///" << std::endl;
         /// build each partition one by one
         for (uint64_t part = 0; part < block_num_; ++part) {
             /// for a single partition, load the data, build blocks & new file
@@ -65,7 +68,7 @@ struct CompactionTask : public Task {
             blocks_.emplace_back(part_blk);
         }
 
-        std::cout << "/// Compaction Finished ...... ///" << std::endl;
+        //std::cout << "/// Compaction Finished ...... ///" << std::endl;
         return Status::SUCCESS;
     }
 

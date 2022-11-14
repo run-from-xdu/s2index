@@ -3,107 +3,7 @@
 #include <gtest/gtest.h>
 #include <ctime>
 
-// total bytes allocated
-static size_t bytes = 0;
-
-// total number of malloc calls
-static size_t allocations = 0;
-
-// total number free calls
-static size_t frees = 0;
-
-// whether or not to track & print allocations
-static bool output = false;
-
-// static vector for tracking allocation sizes
-//static std::vector<std::pair<void*, size_t>> sizes;
-
-static void* alloc(size_t size) {
-    void* p = std::malloc(size);
-    if (output && p != nullptr) {
-        // update stats
-        bytes += size;
-        ++allocations;
-        //sizes.emplace_back(p, size);
-        // for debugging
-        // std::cout << "- allocating " << size << " bytes at memory location " << p << std::endl;
-    }
-    return p;
-}
-
-static void dealloc(void* p) {
-    if (p == nullptr) {
-        return;
-    }
-    if (output) {
-        // update the stats
-        ++frees;
-//        size_t size = 0;
-//        for (auto it = sizes.begin(); it != sizes.end(); ++it) {
-//            if ((*it).first == p) {
-//                size = (*it).second;
-//                sizes.erase(it);
-//                break;
-//            }
-//        }
-        // for debugging
-        // std::cout << "- freeing " << size << " bytes at memory location " << p << std::endl;
-    }
-    std::free(p);
-}
-
-static void enableOutput() {
-    output = true;
-    allocations = 0;
-    frees = 0;
-    bytes = 0;
-    //sizes.clear();
-}
-
-static void disableOutput() {
-    output = false;
-    size_t size = 0;
-//    for (auto it = sizes.begin(); it != sizes.end(); ++it) {
-//        size += (*it).second;
-//    }
-    std::cout << "=> " << size << " bytes allocd at end - total: " << bytes << " bytes mallocd, " << allocations << " malloc(s), " << frees << " free(s)" << std::endl;
-}
-
-
-void* operator new(size_t size) {
-    return alloc(size);
-}
-
-void* operator new(size_t size, std::nothrow_t const&) noexcept {
-    return alloc(size);
-}
-
-void* operator new[](size_t size) {
-    return alloc(size);
-}
-
-void* operator new[](size_t size, std::nothrow_t const&) noexcept {
-    return alloc(size);
-}
-
-void operator delete(void* p) noexcept {
-    dealloc(p);
-}
-
-void operator delete(void* p, std::nothrow_t const&) noexcept {
-    dealloc(p);
-}
-
-void operator delete[](void* p) noexcept {
-    dealloc(p);
-}
-
-void operator delete[](void* p, std::nothrow_t const&) noexcept {
-    dealloc(p);
-}
-
-
-TEST(TestE2E, Flushing) {
+TEST(TestE2E, Performance) {
     auto fileExists = [](const std::string & file_name) -> bool {
         std::ifstream f(file_name.c_str());
         return f.good();
@@ -114,10 +14,9 @@ TEST(TestE2E, Flushing) {
     }
 
     auto index = ssindex::SsIndex<std::string, uint64_t>(ssindex::default_working_directory);
-    uint64_t entry_num = 50000;
+    uint64_t entry_num = 100000;
     for (uint64_t i = 0; i < entry_num; i++) {
         index.Set(std::to_string(i), i);
-        //std::cout << i << std::endl;
     }
 
     index.WaitTaskComplete();
@@ -130,9 +29,7 @@ TEST(TestE2E, Flushing) {
     clock_t start = clock();
 
     for (uint64_t i = 0; i < entry_num; i++) {
-        //std::cout << i << std::endl;
         auto val = index.Get(std::to_string(i));
-        //EXPECT_EQ(val, i);
         if (val == i) correct++;
         else wrong++;
     }
@@ -140,7 +37,6 @@ TEST(TestE2E, Flushing) {
     clock_t end = clock();
     std::cout << "SsIndex: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
     std::cout << "Memory Usage: " << index.GetUsage() << " Bytes" << std::endl;
-    //std::cout << correct << " " << wrong << std::endl;
 
     struct TestKV {
         std::unordered_map<std::string, uint64_t> data;
@@ -164,14 +60,44 @@ TEST(TestE2E, Flushing) {
 
     /// NOTICE: I use dedicated program to calculate the memory usage of
     /// std::unordered_map, so just ignore those related code here.
-    //sizes.reserve(4096);
-    //enableOutput();
     start = clock();
     for (uint64_t i = 0; i < entry_num; i++) {
         EXPECT_EQ(i, kv.Get(std::to_string(i)));
     }
     end = clock();
-    std::cout << "Standard Unordered Map: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | Memory Usage: " << bytes << std::endl;
-    //disableOutput();
+    std::cout << "Standard Unordered Map: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op" << std::endl;
+}
 
+TEST(TestCompaction, FindCandidates) {
+    ssindex::BatchHolder<std::string, uint64_t> holder{};
+
+    for (size_t i = 0; i < ssindex::CompactionThreshold; i++) {
+        holder.AppendBatch(
+                std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("test_file", 1),
+                {ssindex::IndexBlock < uint64_t > {}}
+                );
+    }
+
+    uint64_t st = 0;
+    size_t cnt = 0;
+    std::vector<ssindex::BatchItem<std::string, uint64_t>::Batch> cds{};
+    auto nc = holder.FindCompactionCandidates(&st, &cnt, cds);
+    std::cout << nc << " " << st << " " << cnt << " " << cds.size() << std::endl;
+
+    for (size_t i = 0; i < ssindex::CompactionThreshold / 2; i++) {
+        holder.AppendBatch(
+                std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("/tmp/test_file", 1),
+                {ssindex::IndexBlock < uint64_t > {}}
+        );
+    }
+
+    cds.clear();
+    holder.items_[0].data_.first[0].level_ = 1;
+    holder.items_[1].data_.first[0].level_ = 1;
+    nc = holder.FindCompactionCandidates(&st, &cnt, cds);
+    std::cout << nc << " " << st << " " << cnt << " " << cds.size() << std::endl;
+
+    holder.CommitCompaction(st, cnt, std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("test_file", 1),
+            {ssindex::IndexBlock < uint64_t > {}});
+    std::cout << holder.items_.size() << std::endl;
 }

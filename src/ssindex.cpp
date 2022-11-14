@@ -1,6 +1,7 @@
 #include "ssindex.hpp"
 #include "index_common.hpp"
 #include "task_flush_memtable.hpp"
+#include "task_compaction.hpp"
 
 namespace ssindex {
 
@@ -37,9 +38,34 @@ void SsIndex<KeyType, ValueType>::Set(const KeyType & key, const ValueType & val
                 }
             }
 
-            std::lock_guard<std::shared_mutex> imm_w_latch{immutable_part_mutex_};
-            files_.emplace_back(std::move(raw_ptr->file_handle_));
-            index_blocks_.emplace_back(std::move(raw_ptr->blocks_));
+            std::lock_guard<std::shared_mutex> imm_w_latch{batch_holder_mutex_};
+            batch_holder_.AppendBatch(std::move(raw_ptr->file_handle_), std::move(raw_ptr->blocks_));
+
+            /// schedule a compaction task if needed
+            /// TODO: should we always check the compaction prerequisite?
+            uint64_t start = 0;
+            size_t count = 0;
+            std::vector<typename BatchItem<KeyType, ValueType>::Batch> candidates{};
+            auto need_compaction = batch_holder_.FindCompactionCandidates(&start, &count, candidates);
+            //need_compaction = false; /// turn off compaction
+            if (need_compaction) {
+                auto task = std::make_unique<CompactionTask<KeyType, ValueType>>(candidates, partition_num_);
+                auto pre = []() {
+                    std::cout << "Start Compaction" << std::endl;
+                };
+                auto * raw_ptr_ = task.get();
+                auto updateIndex = [this, raw_ptr_, start, count]() {
+                    std::lock_guard<std::shared_mutex> imm_w_latch{batch_holder_mutex_};
+                    batch_holder_.CommitCompaction(start, count, std::move(raw_ptr_->file_handle_), std::move(raw_ptr_->blocks_));
+
+                    std::cout << "Compaction Finished" << std::endl;
+                };
+                task->SetPreExecute(pre);
+                task->SetPostExecute(updateIndex);
+                scheduler_->ScheduleTask(std::move(task));
+            }
+
+            std::cout << "Flush Memtable Finished" << std::endl;
         };
         task->SetPreExecute(pre);
         task->SetPostExecute(updateIndex);
@@ -69,21 +95,14 @@ auto SsIndex<KeyType, ValueType>::Get(const KeyType & key) -> ValueType {
     assert(partition >= 0 && partition < partition_num_);
     IndexEdge<ValueType> ie{buf.get(), key_buf_len, 0, seed_};
 
-    std::shared_lock<std::shared_mutex> imm_r_latch{immutable_part_mutex_};
-    for (auto iter = index_blocks_.rbegin(); iter != index_blocks_.rend(); iter++) {
-        //std::cout << iter->size() << std::endl;
-        assert(iter->size() == partition_num_);
-        auto ret = iter->at(partition).GetValue(ie);
+    std::shared_lock<std::shared_mutex> imm_r_latch{batch_holder_mutex_};
+    for (auto iter = batch_holder_.rbegin(); iter != batch_holder_.rend(); iter++) {
+        assert(iter->data_.first.size() == partition_num_);
+        auto ret = iter->data_.first.at(partition).GetValue(ie);
         if (ret != key_not_found) {
             return ret;
         }
     }
-//    for (size_t i = index_blocks_.size() - 1; i >= 0; --i) {
-//        auto ret = index_blocks_[i][partition].GetValue(ie);
-//        if (ret != key_not_found) {
-//            return ret;
-//        }
-//    }
 
     return key_not_found;
 }

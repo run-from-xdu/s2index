@@ -21,6 +21,7 @@ public:
         , bits_occupied_by_value_(0)
         , bits_occupied_by_fp_(default_fp_bits)
         , seed_(0x12345678)
+        , level_(0)
         , num_v_(0) {}
 
     auto GetValue(const IndexEdge<ValueType> & edge) const -> ValueType;
@@ -57,6 +58,9 @@ public:
 
         data_.read(ifs);
     }
+
+    /// The level of this block
+    int level_;
 
 private:
     /// Succinct representation of the internal data
