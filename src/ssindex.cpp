@@ -108,6 +108,57 @@ auto SsIndex<KeyType, ValueType>::Get(const KeyType & key) -> ValueType {
 }
 
 template<typename KeyType, typename ValueType>
+void SsIndex<KeyType, ValueType>::Optimize() {
+    auto partitioner = [this](const KeyType & key) -> uint64_t {
+        size_t len = 0;
+        auto buf = IndexUtils<KeyType>::RawBuffer(key, &len);
+        return GetBlockPartition(buf.get(), len);
+    };
+
+    auto task = std::make_unique<FlushMemtableTask<KeyType, ValueType>>(
+            *memtable_.data_,
+            memtable_.id_,
+            partition_num_,
+            partitioner,
+            seed_, fp_bits_);
+
+    auto * raw_ptr = task.get();
+    auto updateIndex = [this, raw_ptr]() {
+        memtable_ = std::move(Memtable{FetchMemtableId(), std::make_shared<std::unordered_map<KeyType, ValueType>>()});
+
+        std::lock_guard<std::shared_mutex> imm_w_latch{batch_holder_mutex_};
+        batch_holder_.AppendBatch(std::move(raw_ptr->file_handle_), std::move(raw_ptr->blocks_));
+    };
+    task->SetPostExecute(updateIndex);
+    scheduler_->ScheduleTask(std::move(task));
+
+    /// wait all the running flush & compaction task to finish
+    scheduler_->Wait();
+
+    /// Compaction all the archived data
+    std::vector<typename BatchItem<KeyType, ValueType>::Batch> candidates{};
+    uint64_t start = 0;
+    size_t count = 0;
+    batch_holder_.FetchOptimizationCandidates(&start, &count, candidates);
+    auto task_ = std::make_unique<CompactionTask<KeyType, ValueType>>(candidates, partition_num_);
+    auto pre = []() {
+        std::cout << "Start Optimization" << std::endl;
+    };
+    auto * raw_ptr_ = task_.get();
+    auto updateIndex_ = [this, raw_ptr_, start, count]() {
+        std::lock_guard<std::shared_mutex> imm_w_latch{batch_holder_mutex_};
+        batch_holder_.CommitCompaction(start, count, std::move(raw_ptr_->file_handle_), std::move(raw_ptr_->blocks_));
+
+        std::cout << "Optimization Finished" << std::endl;
+    };
+    task_->SetPreExecute(pre);
+    task_->SetPostExecute(updateIndex_);
+    scheduler_->ScheduleTask(std::move(task_));
+
+    scheduler_->Wait();
+}
+
+template<typename KeyType, typename ValueType>
 auto SsIndex<KeyType, ValueType>::FlushAndBuildIndexBlocks() -> Status {
     if (memtable_.data_->empty()) {
         return Status::SUCCESS;

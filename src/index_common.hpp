@@ -33,7 +33,7 @@ static constexpr size_t CompactionThreshold = 4;
 /// Default number of partitions
 static constexpr uint64_t DefaultPartitionNum = 8;
 /// Default false positive validation bits
-static constexpr uint64_t DefaultFpBits = 2;
+static constexpr uint64_t DefaultFpBits = 16;
 
 enum Status : int {
     ERROR = -1,

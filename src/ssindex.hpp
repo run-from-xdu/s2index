@@ -10,6 +10,8 @@
 #include "index_archived_file.hpp"
 #include "index_block.hpp"
 #include "scheduler.hpp"
+//#include "task_compaction.hpp"
+//#include "task_flush_memtable.hpp"
 
 /// TODO: there are bunch of places using |IndexBlock| instead
 /// of |std::shared_ptr<IndexBlock>|, which causes many needless
@@ -51,6 +53,14 @@ struct BatchHolder {
                 *iter = Item{{blocks, file}, next_id_};
                 next_id_++;
             }
+        }
+    }
+
+    void FetchOptimizationCandidates(uint64_t * start, size_t * count, std::vector<Batch> & candidates) {
+        *start = items_.at(0).id_;
+        *count = items_.size();
+        for (auto iter = items_.begin(); iter != items_.end(); iter++) {
+            candidates.emplace_back(iter->data_);
         }
     }
 
@@ -145,6 +155,8 @@ public:
     void Set(const KeyType & key, const ValueType & value);
 
     auto Get(const KeyType & key) -> ValueType;
+
+    void Optimize();
 
     inline uint64_t GetBlockPartition(const char * kbuf, const size_t klen) {
         return HASH(kbuf, klen) % partition_num_;

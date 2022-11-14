@@ -14,7 +14,7 @@ TEST(TestE2E, Performance) {
     }
 
     auto index = ssindex::SsIndex<std::string, uint64_t>(ssindex::default_working_directory);
-    uint64_t entry_num = 100000;
+    uint64_t entry_num = 120000;
     for (uint64_t i = 0; i < entry_num; i++) {
         index.Set(std::to_string(i), i);
     }
@@ -37,6 +37,7 @@ TEST(TestE2E, Performance) {
     clock_t end = clock();
     std::cout << "SsIndex: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
     std::cout << "Memory Usage: " << index.GetUsage() << " Bytes" << std::endl;
+    std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
 
     struct TestKV {
         std::unordered_map<std::string, uint64_t> data;
@@ -73,7 +74,7 @@ TEST(TestCompaction, FindCandidates) {
 
     for (size_t i = 0; i < ssindex::CompactionThreshold; i++) {
         holder.AppendBatch(
-                std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("test_file", 1),
+                std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("/tmp/test_file", 1),
                 {ssindex::IndexBlock < uint64_t > {}}
                 );
     }
@@ -97,7 +98,32 @@ TEST(TestCompaction, FindCandidates) {
     nc = holder.FindCompactionCandidates(&st, &cnt, cds);
     std::cout << nc << " " << st << " " << cnt << " " << cds.size() << std::endl;
 
-    holder.CommitCompaction(st, cnt, std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("test_file", 1),
+    holder.CommitCompaction(st, cnt, std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("/tmp/test_file", 1),
             {ssindex::IndexBlock < uint64_t > {}});
     std::cout << holder.items_.size() << std::endl;
+}
+
+TEST(TestE2E, Optimization) {
+    auto fileExists = [](const std::string & file_name) -> bool {
+        std::ifstream f(file_name.c_str());
+        return f.good();
+    };
+    if (fileExists(ssindex::default_working_directory)) {
+        //std::filesystem::remove(ssindex::default_working_directory);
+        std::filesystem::remove_all(ssindex::default_working_directory);
+    }
+
+    auto index = ssindex::SsIndex<std::string, uint64_t>(ssindex::default_working_directory);
+    uint64_t entry_num = 99999;
+    for (uint64_t i = 0; i < entry_num; i++) {
+        index.Set(std::to_string(i), i);
+    }
+
+    index.WaitTaskComplete();
+
+    index.PrintInfo();
+
+    index.Optimize();
+
+    index.PrintInfo();
 }
