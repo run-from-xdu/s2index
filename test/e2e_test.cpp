@@ -126,4 +126,20 @@ TEST(TestE2E, Optimization) {
     index.Optimize();
 
     index.PrintInfo();
+
+    auto correct = 0;
+    auto wrong = 0;
+
+    clock_t start = clock();
+
+    for (uint64_t i = 0; i < entry_num; i++) {
+        auto val = index.Get(std::to_string(i));
+        if (val == i) correct++;
+        else wrong++;
+    }
+
+    clock_t end = clock();
+    std::cout << "SsIndex: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
+    std::cout << "Memory Usage: " << index.GetUsage() << " Bytes" << std::endl;
+    std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
 }
