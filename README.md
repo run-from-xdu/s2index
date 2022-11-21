@@ -4,5 +4,5 @@ Graduation project
 
 Bachelor of CS from XDU
 
-<img src="./resources/architecture" style="zoom:50%;" />
+<img src="./resources/architecture.svg" style="zoom:50%;" />
 
