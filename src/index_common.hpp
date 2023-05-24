@@ -7,7 +7,7 @@
 namespace ssindex {
 
 static const std::string default_working_directory = "/tmp/ssindex/";
-static constexpr auto GetFullPath(const std::string & file_name) -> std::string {
+static auto GetFullPath(const std::string & file_name) -> std::string {
     return default_working_directory + file_name;
 }
 
@@ -27,13 +27,13 @@ using ReadBuffer = char *;
 /// Number of Hash in IndexBlock
 static constexpr size_t NumHashFunctions = 3;
 /// Threshold of flushing memtable to the disk
-static constexpr size_t MemtableFlushThreshold = 10000;
+static constexpr size_t MemtableFlushThreshold = 100000;
 /// Threshold of compaction
-static constexpr size_t CompactionThreshold = 4;
+static constexpr size_t CompactionThreshold = 99999;
 /// Default number of partitions
-static constexpr uint64_t DefaultPartitionNum = 8;
+static constexpr uint64_t DefaultPartitionNum = 32;
 /// Default false positive validation bits
-static constexpr uint64_t DefaultFpBits = 16;
+static constexpr uint64_t DefaultFpBits = 8;
 
 enum Status : int {
     ERROR = -1,
@@ -161,10 +161,21 @@ struct IndexUtils {
     static auto maskCheckLen(const ValueType & x, const uint64_t & len) -> ValueType;
 
     /// |key_not_found| will be returned as the result if key not found
-    static constexpr ValueType KeyNotFound = static_cast<ValueType>(-1);
+    static auto KeyNotFound() -> ValueType;
 
     static auto RawBuffer(const ValueType & value, size_t * length) -> std::unique_ptr<char>;
 };
+
+template<typename ValueType>
+auto IndexUtils<ValueType>::KeyNotFound() -> ValueType {
+    return static_cast<ValueType>(-1);
+}
+
+template<>
+inline auto IndexUtils<std::string>::KeyNotFound() -> std::string {
+    return "KeyNotFound";
+}
+
 
 template<typename ValueType>
 auto IndexUtils<ValueType>::RawBuffer(const ValueType & value, size_t * length) -> std::unique_ptr<char> {

@@ -6,6 +6,7 @@
 #include <shared_mutex>
 #include <vector>
 #include <queue>
+#include <unordered_map>
 
 #include "index_archived_file.hpp"
 #include "index_block.hpp"
@@ -128,7 +129,7 @@ struct BatchHolder {
 template<typename KeyType, typename ValueType>
 class SsIndex {
 public:
-    static constexpr ValueType key_not_found = IndexUtils<ValueType>::KeyNotFound;
+    ValueType key_not_found = IndexUtils<ValueType>::KeyNotFound();
 
     //using MemtableData = std::unordered_map<KeyType, ValueType>;
     using MemtableData = std::shared_ptr<std::unordered_map<KeyType, ValueType>>;

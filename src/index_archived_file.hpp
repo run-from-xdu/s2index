@@ -6,6 +6,7 @@
 #include <memory>
 #include <iostream>
 #include <functional>
+#include <vector>
 
 namespace ssindex {
 

@@ -8,7 +8,7 @@ namespace ssindex {
 template<typename ValueType>
 auto IndexBlock<ValueType>::GetValue(const IndexEdge<ValueType> & ie) const -> ValueType {
     if (data_.Empty()) {
-        return IndexUtils<ValueType>::KeyNotFound;
+        return IndexUtils<ValueType>::KeyNotFound();
     }
 
     uint64_t block_size = bits_occupied_by_value_ + bits_occupied_by_fp_;
@@ -20,7 +20,7 @@ auto IndexBlock<ValueType>::GetValue(const IndexEdge<ValueType> & ie) const -> V
         }
         if (fp_check != IndexUtils<uint64_t>::mask(ie.v_[0] ^ ie.v_[1], bits_occupied_by_fp_)) {
             //std::cout << IndexUtils<uint64_t>::maskCheckLen(ie.v_[0] ^ ie.v_[1], bits_occupied_by_fp_) << std::endl;
-            return IndexUtils<ValueType>::KeyNotFound;
+            return IndexUtils<ValueType>::KeyNotFound();
         }
     }
 
@@ -30,7 +30,7 @@ auto IndexBlock<ValueType>::GetValue(const IndexEdge<ValueType> & ie) const -> V
     }
 
     if (result > max_value_) {
-        return IndexUtils<ValueType>::KeyNotFound;
+        return IndexUtils<ValueType>::KeyNotFound();
     }
 
     return result + min_value_;

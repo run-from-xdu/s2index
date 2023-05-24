@@ -196,5 +196,7 @@ auto SsIndex<KeyType, ValueType>::Flush() -> Status {
 }
 
 template class SsIndex<std::string, uint64_t>;
+template class SsIndex<std::string, uint32_t>;
+// template class SsIndex<uint64_t, uint64_t>;
 
 }  // namespace ssindex

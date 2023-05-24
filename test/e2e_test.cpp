@@ -3,143 +3,176 @@
 #include <gtest/gtest.h>
 #include <ctime>
 
-TEST(TestE2E, Performance) {
+// TestSuite for unsigned int32 type
+TEST(TEST, Uint32) {
+    // Preprocess
     auto fileExists = [](const std::string & file_name) -> bool {
         std::ifstream f(file_name.c_str());
         return f.good();
     };
     if (fileExists(ssindex::default_working_directory)) {
-        //std::filesystem::remove(ssindex::default_working_directory);
         std::filesystem::remove_all(ssindex::default_working_directory);
     }
 
-    auto index = ssindex::SsIndex<std::string, uint64_t>(ssindex::default_working_directory);
-    uint64_t entry_num = 120000;
-    for (uint64_t i = 0; i < entry_num; i++) {
-        index.Set(std::to_string(i), i);
+    std::unordered_map<std::string, uint32_t> u32_map;
+
+    auto u32ssindex = ssindex::SsIndex<std::string, uint32_t>(ssindex::default_working_directory);
+    uint32_t entry_num = 400000;
+
+    // Write data to the index and std::unordered_map
+    for (uint32_t i = 0; i < entry_num; i++) {
+        u32_map[std::to_string(i)] = i;
+        u32ssindex.Set(std::to_string(i), i);
     }
+    u32ssindex.WaitTaskComplete();
 
-    index.WaitTaskComplete();
-
-    index.PrintInfo();
-
+    // SsIndex read performance before Optimize
     auto correct = 0;
     auto wrong = 0;
 
-    clock_t start = clock();
+    clock_t t1 = clock();
 
-    for (uint64_t i = 0; i < entry_num; i++) {
-        auto val = index.Get(std::to_string(i));
+    for (uint32_t i = 0; i < entry_num; i++) {
+        auto val = u32ssindex.Get(std::to_string(i));
         if (val == i) correct++;
         else wrong++;
     }
 
-    clock_t end = clock();
-    std::cout << "SsIndex: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
-    std::cout << "Memory Usage: " << index.GetUsage() << " Bytes" << std::endl;
+    clock_t t2 = clock();
+
+    std::cout << "SsIndex Uint32 Before Optimize: " << double(t2 - t1) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
+    std::cout << "Memory Usage: " << u32ssindex.GetUsage() << " Bytes" << std::endl;
     std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
 
-    struct TestKV {
-        std::unordered_map<std::string, uint64_t> data;
-        std::shared_mutex latch;
+    u32ssindex.Optimize();
+    u32ssindex.WaitTaskComplete();
 
-        void Set(const std::string & k, uint64_t v) {
-            std::lock_guard<std::shared_mutex> w_latch{latch};
-            data[k] = v;
-        }
+    // SsIndex read performance after Optimize
+    correct = 0;
+    wrong = 0;
 
-        uint64_t Get(const std::string & k) {
-            std::shared_lock<std::shared_mutex> r_latch{latch};
-            return data[k];
-        }
-    };
+    clock_t t3 = clock();
 
-    TestKV kv{};
-    for (uint64_t i = 0; i < entry_num; i++) {
-        kv.Set(std::to_string(i), i);
+    for (uint32_t i = 0; i < entry_num; i++) {
+        auto val = u32ssindex.Get(std::to_string(i));
+        if (val == i) correct++;
+        else wrong++;
     }
 
-    /// NOTICE: I use dedicated program to calculate the memory usage of
-    /// std::unordered_map, so just ignore those related code here.
-    start = clock();
-    for (uint64_t i = 0; i < entry_num; i++) {
-        EXPECT_EQ(i, kv.Get(std::to_string(i)));
+    clock_t t4 = clock();
+
+    std::cout << "SsIndex Uint32 After Optimize: " << double(t4 - t3) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
+    std::cout << "Memory Usage: " << u32ssindex.GetUsage() << " Bytes" << std::endl;
+    std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
+
+    // std::unordered_map space usage and read performance
+    correct = 0;
+    wrong = 0;
+
+    auto map_size =  (u32_map.size() * (sizeof(uint32_t) + 6 + sizeof(void*)) + // data list
+        u32_map.bucket_count() * (sizeof(void*) + sizeof(size_t))) // bucket index
+        * 1.5; // estimated allocation overheads
+
+    //std::cout << "std::unordered_map Size: " << map_size << " Bytes" << std::endl;
+
+    clock_t t5 = clock();
+
+    for (uint32_t i = 0; i < entry_num; i++) {
+        auto val = u32_map[std::to_string(i)];
+        if (val == i) correct++;
+        else wrong++;
     }
-    end = clock();
-    std::cout << "Standard Unordered Map: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op" << std::endl;
+
+    clock_t t6 = clock();
+
+    std::cout << "std::unordered_map: " << double(t6 - t5) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
+    std::cout << "Memory Usage: " << map_size << " Bytes" << std::endl;
+    std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
 }
 
-TEST(TestCompaction, FindCandidates) {
-    ssindex::BatchHolder<std::string, uint64_t> holder{};
-
-    for (size_t i = 0; i < ssindex::CompactionThreshold; i++) {
-        holder.AppendBatch(
-                std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("/tmp/test_file", 1),
-                {ssindex::IndexBlock < uint64_t > {}}
-                );
-    }
-
-    uint64_t st = 0;
-    size_t cnt = 0;
-    std::vector<ssindex::BatchItem<std::string, uint64_t>::Batch> cds{};
-    auto nc = holder.FindCompactionCandidates(&st, &cnt, cds);
-    std::cout << nc << " " << st << " " << cnt << " " << cds.size() << std::endl;
-
-    for (size_t i = 0; i < ssindex::CompactionThreshold / 2; i++) {
-        holder.AppendBatch(
-                std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("/tmp/test_file", 1),
-                {ssindex::IndexBlock < uint64_t > {}}
-        );
-    }
-
-    cds.clear();
-    holder.items_[0].data_.first[0].level_ = 1;
-    holder.items_[1].data_.first[0].level_ = 1;
-    nc = holder.FindCompactionCandidates(&st, &cnt, cds);
-    std::cout << nc << " " << st << " " << cnt << " " << cds.size() << std::endl;
-
-    holder.CommitCompaction(st, cnt, std::make_shared<ssindex::IndexArchivedFile<std::string, uint64_t>>("/tmp/test_file", 1),
-            {ssindex::IndexBlock < uint64_t > {}});
-    std::cout << holder.items_.size() << std::endl;
-}
-
-TEST(TestE2E, Optimization) {
+// TestSuite for unsigned int64 type
+TEST(TEST, Uint64) {
+    // Preprocess
     auto fileExists = [](const std::string & file_name) -> bool {
         std::ifstream f(file_name.c_str());
         return f.good();
     };
     if (fileExists(ssindex::default_working_directory)) {
-        //std::filesystem::remove(ssindex::default_working_directory);
         std::filesystem::remove_all(ssindex::default_working_directory);
     }
 
-    auto index = ssindex::SsIndex<std::string, uint64_t>(ssindex::default_working_directory);
-    uint64_t entry_num = 99999;
+    std::unordered_map<std::string, uint64_t> u64_map;
+
+    // Write data to the index and std::unordered_map
+    auto u64ssindex = ssindex::SsIndex<std::string, uint64_t>(ssindex::default_working_directory);
+    uint64_t entry_num = 400000;
+
     for (uint64_t i = 0; i < entry_num; i++) {
-        index.Set(std::to_string(i), i);
+        u64_map[std::to_string(i)] = i;
+        u64ssindex.Set(std::to_string(i), i);
     }
+    u64ssindex.WaitTaskComplete();
 
-    index.WaitTaskComplete();
-
-    index.PrintInfo();
-
-    index.Optimize();
-
-    index.PrintInfo();
-
+    // SsIndex read performance before Optimize
     auto correct = 0;
     auto wrong = 0;
 
-    clock_t start = clock();
+    clock_t t1 = clock();
 
     for (uint64_t i = 0; i < entry_num; i++) {
-        auto val = index.Get(std::to_string(i));
+        auto val = u64ssindex.Get(std::to_string(i));
         if (val == i) correct++;
         else wrong++;
     }
 
-    clock_t end = clock();
-    std::cout << "SsIndex: " << double(end - start) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
-    std::cout << "Memory Usage: " << index.GetUsage() << " Bytes" << std::endl;
+    clock_t t2 = clock();
+
+    std::cout << "SsIndex Uint64 Before Optimize: " << double(t2 - t1) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
+    std::cout << "Memory Usage: " << u64ssindex.GetUsage() << " Bytes" << std::endl;
+    std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
+
+    u64ssindex.Optimize();
+    u64ssindex.WaitTaskComplete();
+
+    // SsIndex read performance after Optimize
+    correct = 0;
+    wrong = 0;
+
+    clock_t t3 = clock();
+
+    for (uint64_t i = 0; i < entry_num; i++) {
+        auto val = u64ssindex.Get(std::to_string(i));
+        if (val == i) correct++;
+        else wrong++;
+    }
+
+    clock_t t4 = clock();
+
+    std::cout << "SsIndex Uint64 After Optimize: " << double(t4 - t3) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
+    std::cout << "Memory Usage: " << u64ssindex.GetUsage() << " Bytes" << std::endl;
+    std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
+
+    // std::unordered_map space usage and read performance
+    correct = 0;
+    wrong = 0;
+
+    auto map_size =  (u64_map.size() * (sizeof(uint64_t) + 6 + sizeof(void*)) + // data list
+        u64_map.bucket_count() * (sizeof(void*) + sizeof(size_t))) // bucket index
+        * 1.5; // estimated allocation overheads
+
+    //std::cout << "std::unordered_map Size: " << map_size << " Bytes" << std::endl;
+
+    clock_t t5 = clock();
+
+    for (uint64_t i = 0; i < entry_num; i++) {
+        auto val = u64_map[std::to_string(i)];
+        if (val == i) correct++;
+        else wrong++;
+    }
+
+    clock_t t6 = clock();
+
+    std::cout << "std::unordered_map: " << double(t6 - t5) / CLOCKS_PER_SEC * 1000 * 1000 / double(entry_num) << " us/op | ";
+    std::cout << "Memory Usage: " << map_size << " Bytes" << std::endl;
     std::cout << "Correct Rate: " << double(correct) / double(correct + wrong) << std::endl;
 }
